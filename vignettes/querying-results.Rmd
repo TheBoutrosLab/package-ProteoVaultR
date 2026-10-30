@@ -1,0 +1,77 @@
+---
+title: "Querying ProteoVault results"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Querying ProteoVault results}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Function names
+
+`tbl_*()` returns a lazy database table, `matrix_*()` materializes an R matrix, `summarize_*()` computes a summary, and `plot_*()` returns a plot. These prefixes group related functions in autocomplete. Connection and metadata helpers keep their action names (`open_vault()`, `close_vault()`, `vault_info()`).
+
+The R source follows the same groups: `R/tables.R` contains lazy table accessors, `R/matrices.R` contains matrix materializers, `R/summaries.R` contains summaries, `R/sources.R` resolves quantification sources, `R/qc.R` contains QC plots, `R/protein_coverage.R` contains the protein coverage plot, and `R/vault.R` manages connections, schema checks, and metadata.
+
+## Protein and peptide quantity tables
+
+The protein quantity table has one row per quantified protein group and sample. Group IDs represent protein groups, not individual member proteins.
+
+```{r}
+library(ProteoVaultR)
+library(dplyr)
+
+fixture <- file.path("..", "tests", "fixtures", "example-vault.duckdb")
+vault <- open_vault(path = fixture)
+
+protein_table <- tbl_protein_quant(vault = vault) %>%
+    filter(quantity > 0) %>%
+    select(
+        sample_name,
+        group_id,
+        source_group_id,
+        grouping_method,
+        quantity
+    ) %>%
+    collect()
+protein_table
+```
+
+The vault stores precursor quantities (modified peptide plus charge), not a native peptide quantity table. For an exploratory modified-peptide table, sum the positive precursor quantities across charge states. This aggregation is a choice made in R; it is not a DIA-NN peptide quantification result. Keep `modified_sequence` in the grouping so different modified forms remain separate.
+
+```{r}
+peptide_table <- tbl_precursor_quant(vault = vault) %>%
+    filter(quantity > 0) %>%
+    group_by(sample_name, modified_sequence) %>%
+    summarise(
+        quantity = sum(quantity),
+        n_precursors = n_distinct(precursor_id),
+        .groups = "drop"
+    ) %>%
+    collect()
+peptide_table
+
+close_vault(vault)
+```
+
+If multiple quantification sources are available, specify `source_id` in each accessor. For analyses that require an exact precursor definition, retain `precursor_id`, `modified_sequence`, and `charge` instead of aggregating.
+
+## Query behavior
+
+- `tbl_qc_metrics()` returns the merged cohort QC metrics lazily, preserving sample and cohort rows, groups, status, and missing values. Its `value` column is text; convert selected numeric metrics when needed.
+- `tbl_protein_quant()`, `tbl_precursor_quant()`, `tbl_psms()`, `tbl_psm_scores()`, `tbl_protein_groups()`, `tbl_group_members()`, and `tbl_vault()` return lazy dbplyr queries.
+- `matrix_protein_abundance()` and `matrix_precursor_abundance()` materialize numeric matrices. Missing values remain NA, zeros remain zero, and duplicate feature/sample measurements cause an error.
+- `summarize_quantified_counts()` aggregates distinct positive features in DuckDB and returns a small tibble. It counts each feature once per sample, including when several channels refer to that sample.
+- A quantification accessor selects one source and method. If several source files qualify, provide `source_id` from `vault_info(vault)$sources` explicitly.
+- Metadata access does not scan all fact tables. Exact BIGINT provenance values, such as nanosecond timestamps, retain their integer64 representation.
+
+Configure engine resources at connection time if needed:
+
+```r
+vault <- open_vault(
+    path = "results.proteovault.duckdb",
+    config = list(memory_limit = "2GB", threads = "2")
+)
+```
+
+This limits engine resources, not the size of matrices collected into R memory.

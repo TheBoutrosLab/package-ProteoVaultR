@@ -1,23 +1,30 @@
-# template-base
+# ProteoVaultR
 
-[![GitHub release](https://img.shields.io/github/v/release/TheBoutrosLab/template-base)](https://github.com/TheBoutrosLab/template-base/actions/workflows/prepare-release.yaml)
+ProteoVaultR reads linked proteomics results from ProteoVault DuckDB files. It provides read-only connections, lazy queries, quantitative matrices, summaries, and QC plots.
 
-Template Repository for the Boutros Lab general repos. Describe a simple overview of use/purpose here.
+## Install
 
-## Description
+Requires R 4.2 or newer, DuckDB 2.0 or newer, and dbplyr 2.6 or newer. Install the latest version from GitHub:
 
-An in-depth paragraph about your project and overview of use.
+```r
+install.packages("remotes")
+remotes::install_github("TheBoutrosLab/package-ProteoVaultR")
+```
+
+## Quick start
+
+```r
+library(ProteoVaultR)
+
+vault <- open_vault(path = "results.proteovault.duckdb")
+vault_info(vault)
+counts <- summarize_quantified_counts(vault = vault)
+abundance <- matrix_protein_abundance(vault = vault)
+close_vault(vault)
+```
+
+See the vignettes for [getting started](vignettes/getting-started.Rmd), [querying results](vignettes/querying-results.Rmd), [optional layers](vignettes/optional-layers.Rmd), [protein coverage](vignettes/protein-coverage.Rmd), and [quality control](vignettes/qc.Rmd). These can be incorporated into a bookdown site later. Function-specific help is available with `?open_vault` and similar R help topics.
 
 ## License
 
-Author: Name1, Name2
-
-[This project] is licensed under the GNU General Public License version 2. See the file LICENSE.md for the terms of the GNU GPL license.
-
-<one line to give the project/program's name and a brief idea of what it does.>
-
-Copyright (C) 2026 Sanford Burnham Prebys Medical Discovery Institute ("Boutros Lab")
-
-This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+GNU GPL version 2 or later. Copyright 2026 Boutros Lab, Sanford Burnham Prebys Medical Discovery Institute.
