@@ -16,8 +16,7 @@ jobs:
         with:
           use-public-rspm: true
       - uses: r-lib/actions/setup-pandoc@v2
-      - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: any::rcmdcheck
-          needs: check
+      - name: Install R dependencies
+        run: |
+          Rscript -e 'install.packages(c("remotes", "rcmdcheck")); remotes::install_deps(dependencies = TRUE)'
       - uses: r-lib/actions/check-r-package@v2
