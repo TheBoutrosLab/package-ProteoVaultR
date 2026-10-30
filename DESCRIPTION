@@ -12,6 +12,7 @@ License: GPL (>= 2)
 Encoding: UTF-8
 Depends: R (>= 4.2.0)
 Imports:
+    bit64,
     BoutrosLab.plotting.general,
     DBI,
     duckdb (>= 2.0.0),
