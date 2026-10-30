@@ -1,0 +1,68 @@
+---
+title: "Quality control plots"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Quality control plots}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+ProteoVaultR plots precursor and protein-group quantity distributions from the core DIA-NN matrices. The plots exclude missing and nonpositive quantities and use a log2 scale.
+
+```{r}
+library(ProteoVaultR)
+
+fixture <- file.path("..", "tests", "fixtures", "example-vault.duckdb")
+vault <- open_vault(path = fixture)
+
+precursor_plot <- plot_precursor_quantity_distribution(
+    vault = vault,
+    quantity_type = "normalized",
+    plot_type = "boxplot"
+)
+protein_plot <- plot_protein_quantity_distribution(
+    vault = vault,
+    plot_type = "violin"
+)
+
+precursor_plot
+protein_plot
+```
+
+For raw precursor quantities or a `max_q_value` filter, the vault needs `quant-details`. The cutoff only filters rows present in the DIA-NN report; it cannot restore rows DIA-NN omitted.
+
+```{r}
+raw_plot <- plot_precursor_quantity_distribution(
+    vault = vault,
+    quantity_type = "raw",
+    plot_type = "boxplot",
+    max_q_value = 0.05
+)
+raw_plot
+close_vault(vault)
+```
+
+The fixture includes a small `quant-details` source. A production vault needs the optional `quant-details` layer for raw quantities or a `max_q_value` filter. The optional `qc` layer contains published cohort QC metrics. Inspect available metric names before plotting; they depend on the QC pipeline output.
+
+```{r, eval=FALSE}
+metrics <- tbl_qc_metrics(vault = vault)
+available_metrics <- dplyr::collect(
+    dplyr::distinct(metrics, metric_name)
+)
+
+metric_plot <- plot_qc_metric(
+    vault = vault,
+    metric_name = available_metrics$metric_name[[1L]],
+    style = "ggplot2"
+)
+
+charge_plot <- plot_qc_charge_psm_counts(
+    vault = vault,
+    charges = 1:4,
+    style = "BPG"
+)
+
+close_vault(vault)
+```
+
+`plot_qc_boxplot()` displays percentile summaries where the QC output supplies p05, p25, p50, p75, and p95 metrics. The `plot_qc_metric()`, `plot_qc_boxplot()`, and `plot_qc_charge_psm_counts()` functions accept source and fraction filters; see their R help pages. BPG plots return lattice objects, while the distribution plots return ggplot objects.

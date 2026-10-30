@@ -1,0 +1,7 @@
+linters: lintr::linters_with_defaults(
+    indentation_linter = NULL,
+    object_usage_linter = NULL,
+    object_length_linter = NULL,
+    pipe_consistency_linter = lintr::pipe_consistency_linter(pipe = "%>%"),
+    line_length_linter = lintr::line_length_linter(length = 120L)
+  )

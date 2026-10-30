@@ -1,0 +1,14 @@
+^\.git$
+^\.github$
+^\.gitignore$
+^docs$
+^README\.md$
+^CHANGELOG\.md$
+^LICENSE$
+^.*\.Rcheck$
+^.*\.tar\.gz$
+^CONTRIBUTING\.md$
+^.*\.Rproj$
+^\.Rproj\.user$
+^tests/files$
+^\.lintr$

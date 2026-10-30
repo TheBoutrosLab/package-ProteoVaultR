@@ -1,0 +1,38 @@
+Package: ProteoVaultR
+Title: Query Linked Proteomics Results from ProteoVault Databases
+Version: 0.1.0
+Authors@R: c(
+    person("Chenghao", "Zhu", email = "czhu@sbpdiscovery.org", role = c("aut", "cre")),
+    person("Boutros Lab", role = "cph"))
+Description: Read proteomics results saved by ProteoVault as DuckDB databases.
+    Provides read-only connections, lazy queries for quantification and
+    identification results, protein-group membership, quantitative matrices,
+    and per-sample summaries while preserving source and method provenance.
+License: GPL (>= 2)
+Encoding: UTF-8
+Depends: R (>= 4.2.0)
+Imports:
+    bit64,
+    BoutrosLab.plotting.general,
+    DBI,
+    duckdb (>= 2.0.0),
+    dplyr (>= 1.1.0),
+    ggplot2,
+    lattice,
+    dbplyr (>= 2.6.0),
+    tibble,
+    magrittr,
+    rlang,
+    stats,
+    utils
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    roxygen2
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+URL: https://github.com/TheBoutrosLab/package-ProteoVaultR
+BugReports: https://github.com/TheBoutrosLab/package-ProteoVaultR/issues
+Config/roxygen2/version: 8.0.0
