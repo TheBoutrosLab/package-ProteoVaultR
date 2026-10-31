@@ -8,7 +8,8 @@ matrix_precursor_abundance(
   vault,
   source_id = NULL,
   method = "matrix",
-  samples = NULL
+  samples = NULL,
+  duplicates = c("best", "error", "sum", "mean")
 )
 }
 \arguments{
@@ -21,10 +22,16 @@ precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normal
 and \code{Precursor.Translated}.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
+
+\item{duplicates}{How to resolve repeated feature/sample measurements:
+\code{"best"} (default) keeps the largest nonmissing quantity, \code{"sum"} sums
+nonmissing quantities, \code{"mean"} averages them, and \code{"error"} rejects
+duplicates. An all-missing pair remains NA for each numeric choice.}
 }
 \value{
 A numeric precursor-by-sample matrix, collected into R memory.
 }
 \description{
-Does not collapse modifications or charge states into peptide quantities.
+Row names are internal precursor IDs. This function does not collapse
+modifications or charge states into peptide quantities.
 }

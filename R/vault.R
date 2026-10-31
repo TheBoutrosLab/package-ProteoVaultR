@@ -61,6 +61,9 @@ open_vault <- function(path, config = list()) {
         ),
         class = "proteovault"
     )
+    if (!bit64::is.integer64(vault$sources$mtime_ns)) {
+        stop("Source timestamps must retain their 64-bit representation", call. = FALSE)
+    }
     complete <- TRUE
     vault
 }
