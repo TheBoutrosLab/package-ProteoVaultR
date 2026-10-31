@@ -1,6 +1,7 @@
 test_that("matrices preserve values, identifiers, and requested sample order", {
     vault <- open_vault(make_test_vault())
     on.exit(close_vault(vault), add = TRUE)
+    expect_message(matrix_protein_abundance(vault), "Collapsed 0 duplicated source_group_id")
     result <- matrix_protein_abundance(vault)
     expect_equal(dim(result), c(2L, 2L))
     expect_equal(rownames(result), c("P1;P2", "P3"))
@@ -38,6 +39,10 @@ test_that("duplicate policies resolve each source group and sample", {
     )
     vault <- open_vault(path)
     on.exit(close_vault(vault), add = TRUE)
+    expect_message(
+        matrix_protein_abundance(vault),
+        "Collapsed 1 duplicated source_group_id ID\\(s\\) using best"
+    )
     expect_equal(matrix_protein_abundance(vault)["P1;P2", "S1"], 150)
     expect_true(is.na(matrix_protein_abundance(vault)["P1;P2", "S2"]))
     expect_equal(matrix_protein_abundance(vault, duplicates = "sum")["P1;P2", "S1"], 250)
@@ -54,6 +59,10 @@ test_that("duplicate policy also applies to precursor matrices", {
     edit_test_vault(path, "INSERT INTO precursor_quant VALUES (51,114,102,1,12,NULL,NULL)")
     vault <- open_vault(path)
     on.exit(close_vault(vault), add = TRUE)
+    expect_message(
+        matrix_precursor_abundance(vault),
+        "Collapsed 1 duplicated precursor_id ID\\(s\\) using best"
+    )
     expect_equal(matrix_precursor_abundance(vault)["51", "S1"], 12)
     expect_equal(matrix_precursor_abundance(vault, duplicates = "sum")["51", "S1"], 22)
     expect_error(matrix_precursor_abundance(vault, duplicates = "error"), "Duplicate feature/sample")

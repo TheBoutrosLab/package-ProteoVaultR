@@ -42,6 +42,13 @@ matrix_quant <- function(
         }
     }
     values <- dplyr::collect(selected)
+    if (duplicates != "error") {
+        duplicate_ids <- unique(values[[feature]][duplicated(values[c(feature, "sample_name")])])
+        message(sprintf(
+            "Collapsed %d duplicated %s ID(s) using %s",
+            length(duplicate_ids), feature, duplicates
+        ))
+    }
     if (nrow(values) && duplicates != "error") {
         values <- values %>%
             dplyr::group_by(dplyr::across(dplyr::all_of(c(feature, "sample_name")))) %>%
