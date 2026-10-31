@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Use source group labels as default protein matrix row names and allow selecting internal group IDs and duplicate handling.
+
 ## [0.1.0] - 2026-10-30
 
 ### Added
@@ -16,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - QC metric access and plots for charge counts, metric distributions, precursor quantities, and protein-group quantities.
 - Protein sequence coverage plots with validated peptide and PTM annotations.
 - R help pages, vignettes, a synthetic DuckDB fixture, tests, and R CMD check CI.
+
 
 [0.1.0]: https://github.com/TheBoutrosLab/package-ProteoVaultR/releases/tag/v0.1.0
 [unreleased]: https://github.com/TheBoutrosLab/package-ProteoVaultR/compare/v0.1.0...HEAD

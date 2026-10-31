@@ -8,7 +8,9 @@ matrix_protein_abundance(
   vault,
   source_id = NULL,
   method = "matrix",
-  samples = NULL
+  samples = NULL,
+  row_id = c("source_group_id", "group_id"),
+  duplicates = c("best", "error", "sum", "mean")
 )
 }
 \arguments{
@@ -21,11 +23,20 @@ precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normal
 and \code{Precursor.Translated}.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
+
+\item{row_id}{Row identifier: \code{"source_group_id"} (default) or \code{"group_id"}.}
+
+\item{duplicates}{How to resolve repeated feature/sample measurements:
+\code{"best"} (default) keeps the largest nonmissing quantity, \code{"sum"} sums
+nonmissing quantities, \code{"mean"} averages them, and \code{"error"} rejects
+duplicates. An all-missing pair remains NA for each numeric choice.}
 }
 \value{
 A numeric group-by-sample matrix, collected into R memory.
 }
 \description{
-Row names are database group IDs; access annotations with \code{\link[=tbl_protein_groups]{tbl_protein_groups()}}
-and \code{\link[=tbl_group_members]{tbl_group_members()}}. Quantities are not transformed or normalized.
+By default row names use the original source-group labels. Use
+\code{row_id = "group_id"} for vault-internal numeric group IDs. Quantities are
+not transformed or normalized. Repeated source-group labels are resolved
+separately for each sample according to \code{duplicates}.
 }

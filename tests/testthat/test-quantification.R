@@ -52,7 +52,8 @@ test_that("counts count features rather than repeated measurements", {
     on.exit(close_vault(vault), add = TRUE)
     counts <- summarize_quantified_counts(vault)
     expect_equal(as.numeric(counts$quantified_count), c(1, 1))
-    expect_error(matrix_protein_abundance(vault), "Duplicate feature/sample")
+    expect_equal(matrix_protein_abundance(vault)["P1;P2", "S1"], 100)
+    expect_error(matrix_protein_abundance(vault, duplicates = "error"), "Duplicate feature/sample")
 })
 
 

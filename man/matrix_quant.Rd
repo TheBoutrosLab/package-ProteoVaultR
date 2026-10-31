@@ -4,7 +4,12 @@
 \alias{matrix_quant}
 \title{Materialize a quantitative matrix}
 \usage{
-matrix_quant(query, feature, samples = NULL)
+matrix_quant(
+  query,
+  feature,
+  samples = NULL,
+  duplicates = c("best", "error", "sum", "mean")
+)
 }
 \arguments{
 \item{query}{A lazy quantitative query with sample_name and quantity columns.}
@@ -12,13 +17,17 @@ matrix_quant(query, feature, samples = NULL)
 \item{feature}{Name of the feature identifier column.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
+
+\item{duplicates}{How to resolve repeated feature/sample measurements:
+\code{"best"} (default) keeps the largest nonmissing quantity, \code{"sum"} sums
+nonmissing quantities, \code{"mean"} averages them, and \code{"error"} rejects
+duplicates. An all-missing pair remains NA for each numeric choice.}
 }
 \value{
-A numeric feature-by-sample matrix with original identifiers.
+A numeric feature-by-sample matrix with the selected identifiers.
 }
 \description{
-Filters to one source and method before retrieving feature/sample quantities.
-Rejects duplicate feature/sample records instead of summing them. Missing
-combinations become NA; explicit zeros remain zero. This operation allocates
-an R matrix and is not lazy.
+Retrieves one source and method before constructing a feature-by-sample
+matrix. Missing combinations remain NA and explicit zeros remain zero.
+Duplicate resolution takes place within each feature/sample pair.
 }
