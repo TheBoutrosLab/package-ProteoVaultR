@@ -148,6 +148,7 @@ vault_schema <- function() {
         psm_features = c("psm_id", "name", "value"),
         psm_metadata = c("psm_id", "name", "value"),
         proteins = c("protein_id", "accession", "is_decoy", "is_contaminant"),
+        protein_identifiers = c("protein_id", "source_id", "source_accession", "mapping_type", "mapped_id"),
         protein_groups = c(
             "group_id", "source_id", "source_group_id", "method_id",
             "group_type", "score", "score_type"
@@ -218,7 +219,7 @@ check_schema <- function(connection) {
     if (!identical(unname(metadata["format"]), "ProteoVault")) {
         stop("Database is not identified as ProteoVault", call. = FALSE)
     }
-    if (!identical(unname(metadata["schema_version"]), "1.0.0")) {
+    if (!identical(unname(metadata["schema_version"]), "1.1.0")) {
         stop("Unsupported ProteoVault schema version: ", metadata["schema_version"], call. = FALSE)
     }
     metadata

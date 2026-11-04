@@ -9,7 +9,7 @@ vignette: >
 
 ## Optional layers and interpretation
 
-The compact schema 1.0.0 keeps DIA-NN matrices in core. Full report quantities require `proteovault add-layer DATABASE --layer quant-details`. This reader supports the compact layout only.
+Schema 1.1.0 keeps DIA-NN matrices in core. Full report quantities require `proteovault add-layer DATABASE --layer quant-details`.
 
 Protein sequences can be added to an existing vault with
 `proteovault add-fasta DATABASE --fasta SEARCH_DATABASE.fasta`. The imported

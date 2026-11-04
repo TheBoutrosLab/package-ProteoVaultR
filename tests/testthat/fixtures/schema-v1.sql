@@ -51,6 +51,12 @@ CREATE TABLE proteins (
     protein_id BIGINT PRIMARY KEY, accession VARCHAR NOT NULL,
     sequence VARCHAR, description VARCHAR, is_decoy BOOLEAN, is_contaminant BOOLEAN
 );
+CREATE TABLE protein_identifiers (
+    protein_id BIGINT NOT NULL, source_id BIGINT NOT NULL,
+    source_accession VARCHAR NOT NULL, mapping_type VARCHAR NOT NULL,
+    mapped_id VARCHAR NOT NULL,
+    PRIMARY KEY (protein_id, source_id, mapping_type, mapped_id)
+);
 CREATE TABLE peptide_proteins (
     peptide_id BIGINT NOT NULL, protein_id BIGINT NOT NULL,
     PRIMARY KEY(peptide_id, protein_id)

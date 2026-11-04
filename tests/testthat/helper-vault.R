@@ -6,7 +6,7 @@ make_test_vault <- function(optional = FALSE, path = tempfile(fileext = ".duckdb
         if (nzchar(trimws(statement))) DBI::dbExecute(connection, statement)
     }
     statements <- c(
-        "INSERT INTO metadata VALUES ('format','ProteoVault'),('schema_version','1.0.0'),('producer_version','0.1.0')",
+        "INSERT INTO metadata VALUES ('format','ProteoVault'),('schema_version','1.1.0'),('producer_version','0.1.0')",
         "INSERT INTO analysis VALUES (1,'TEST','metapipeline-ProteomicDIA','1.3.0','/not/a/real/source/root')",
         "INSERT INTO samples VALUES (11,'S1'),(12,'S2'),(13,'S3')",
         paste0(
