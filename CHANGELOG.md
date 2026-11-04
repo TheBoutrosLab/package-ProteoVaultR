@@ -5,9 +5,11 @@ All notable changes to ProteoVaultR are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] - 2026-11-04
 
 ### Changed
+
+- Read ProteoVault schema 1.1.0 and expose UniProt protein annotations through `tbl_protein_identifiers()`.
 
 - Use source group labels as default protein matrix row names and allow selecting internal group IDs and duplicate handling.
 

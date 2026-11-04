@@ -20,8 +20,13 @@ vault <- open_vault(path = "results.proteovault.duckdb")
 vault_info(vault)
 counts <- summarize_quantified_counts(vault = vault)
 abundance <- matrix_protein_abundance(vault = vault)
+genes <- dplyr::collect(tbl_protein_identifiers(vault, mapping_type = "Gene_Name"))
 close_vault(vault)
 ```
+
+`tbl_protein_identifiers()` reads UniProt annotations when the optional
+`uniprot-idmapping` layer is present. It retains multiple mappings per protein
+and the mapping archive's `source_id`.
 
 See the vignettes for [getting started](vignettes/getting-started.Rmd), [querying results](vignettes/querying-results.Rmd), [optional layers](vignettes/optional-layers.Rmd), [protein coverage](vignettes/protein-coverage.Rmd), and [quality control](vignettes/qc.Rmd). These can be incorporated into a bookdown site later. Function-specific help is available with `?open_vault` and similar R help topics.
 

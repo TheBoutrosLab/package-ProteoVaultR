@@ -58,6 +58,22 @@ If multiple quantification sources are available, specify `source_id` in each ac
 
 ## Query behavior
 
+When a UniProt ID mapping archive has been imported, query its protein annotations
+in long form. Multiple values for a mapping type remain separate. The `accession`
+column is the original protein identifier; `source_accession` is the UniProt
+accession matched in the archive.
+
+```r
+tbl_protein_identifiers(vault, mapping_type = "Gene_Name") %>%
+    select(accession, source_accession, mapped_id, source_id) %>%
+    collect()
+```
+
+To select a particular mapping archive, pass its `source_id` from
+`vault_info(vault)$sources`. Annotation rows refer to individual proteins. Join
+through `protein_group_members` when relating them to quantified groups, and
+retain all mappings unless your analysis defines a selection rule.
+
 - `tbl_qc_metrics()` returns the merged cohort QC metrics lazily, preserving sample and cohort rows, groups, status, and missing values. Its `value` column is text; convert selected numeric metrics when needed.
 - `tbl_protein_quant()`, `tbl_precursor_quant()`, `tbl_psms()`, `tbl_psm_scores()`, `tbl_protein_groups()`, `tbl_group_members()`, and `tbl_vault()` return lazy dbplyr queries.
 - `matrix_protein_abundance()` and `matrix_precursor_abundance()` materialize numeric matrices. Protein rows use source group labels by default; set `row_id = "group_id"` for internal IDs. Missing values remain NA, zeros remain zero, and repeated feature/sample measurements keep the largest nonmissing quantity by default. Use `duplicates = "error"`, `"sum"`, or `"mean"` to choose another policy.

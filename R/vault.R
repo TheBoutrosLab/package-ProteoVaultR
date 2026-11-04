@@ -246,7 +246,8 @@ vault_info <- function(vault) {
         search = "raw-search",
         MSBooster = "msbooster",
         qc = "qc",
-        reference = "fasta"
+        reference = "fasta",
+        annotation = "uniprot-idmapping"
     )
     layers <- unname(stage_layers[vault$sources$stage])
     list(
@@ -267,6 +268,14 @@ vault_info <- function(vault) {
 #' @export
 require_layer <- function(vault, layer) {
     if (!layer %in% vault_info(vault = vault)$layers) {
+        if (identical(layer, "uniprot-idmapping")) {
+            stop(
+                "Layer 'uniprot-idmapping' is not imported. Add it with: ",
+                "proteovault add-uniprot-idmapping ", shQuote(vault$path),
+                " --mapping /path/to/UP000005640_9606.idmapping.gz",
+                call. = FALSE
+            )
+        }
         stop(
             "Layer '", layer, "' is not imported. Add it with: proteovault add-layer ",
             shQuote(vault$path), " --layer ", layer,
