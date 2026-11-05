@@ -13,6 +13,8 @@
 #' @param source_id Optional source identifier. For `"both"`, provide a named
 #'   vector with `normalized` and `raw` source IDs if selection is ambiguous.
 #' @param samples Optional sample names to select and order.
+#'   Attached `sample_id` metadata changes x axis labels, while selection
+#'   continues to use the original sample names.
 #' @param max_q_value Optional inclusive run-specific precursor q-value cutoff
 #'   between 0 and 1. Requires the `quant-details` layer. Cannot recover rows
 #'   omitted by DIA-NN when it generated the report.
@@ -87,7 +89,8 @@ plot_precursor_quantity_distribution <- function(
         samples = samples,
         plot_type = plot_type,
         quantity_types = selected_types,
-        label = "precursor"
+        label = "precursor",
+        sample_labels = vault_sample_labels(vault)
     )
 }
 
@@ -100,6 +103,8 @@ plot_precursor_quantity_distribution <- function(
 #' @param plot_type `"boxplot"` or `"violin"`.
 #' @param source_id Optional DIA-NN protein-group matrix source identifier.
 #' @param samples Optional sample names to select and order.
+#'   Attached `sample_id` metadata changes x axis labels, while selection
+#'   continues to use the original sample names.
 #' @return A ggplot object. Quantities are displayed on a log2 scale.
 #' @export
 plot_protein_quantity_distribution <- function(
@@ -124,7 +129,8 @@ plot_protein_quantity_distribution <- function(
         samples = samples,
         plot_type = plot_type,
         quantity_types = "normalized",
-        label = "protein-group"
+        label = "protein-group",
+        sample_labels = vault_sample_labels(vault)
     )
 }
 
@@ -133,7 +139,8 @@ plot_quantity_distribution <- function(
     samples,
     plot_type,
     quantity_types,
-    label
+    label,
+    sample_labels = NULL
 ) {
     available <- sort(unique(quantities$sample_name))
     if (is.null(samples)) {
@@ -191,6 +198,11 @@ plot_quantity_distribution <- function(
             facets = ggplot2::vars(quantity_type),
             ncol = 1
         )
+    }
+    if (!is.null(sample_labels)) {
+        labels <- stats::setNames(samples, samples)
+        labels[names(sample_labels)] <- sample_labels
+        plot <- plot + ggplot2::scale_x_discrete(labels = labels)
     }
     plot +
         ggplot2::labs(

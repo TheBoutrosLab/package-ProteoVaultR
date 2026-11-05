@@ -18,7 +18,9 @@ plot_protein_quantity_distribution(
 
 \item{source_id}{Optional DIA-NN protein-group matrix source identifier.}
 
-\item{samples}{Optional sample names to select and order.}
+\item{samples}{Optional sample names to select and order.
+Attached \code{sample_id} metadata changes x axis labels, while selection
+continues to use the original sample names.}
 }
 \value{
 A ggplot object. Quantities are displayed on a log2 scale.

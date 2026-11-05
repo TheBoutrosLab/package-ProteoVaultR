@@ -57,7 +57,8 @@ open_vault <- function(path, config = list()) {
             sources = tibble::as_tibble(DBI::dbGetQuery(
                 conn = connection,
                 statement = "SELECT * FROM source_files ORDER BY relative_path"
-            ))
+            )),
+            sample_metadata = NULL
         ),
         class = "proteovault"
     )
@@ -66,6 +67,61 @@ open_vault <- function(path, config = list()) {
     }
     complete <- TRUE
     vault
+}
+
+#' Attach sample metadata to a vault handle
+#'
+#' Metadata is stored only in the returned R handle. The DuckDB database is
+#' never modified. Match rows using the original `sample_name`; an optional
+#' `sample_id` column supplies shorter labels for quantity distribution plots.
+#' Samples without a metadata row retain their original plot label.
+#'
+#' @inheritParams close_vault
+#' @param metadata A data frame with a unique, nonmissing `sample_name` column
+#'   matching names in the vault. Other columns are retained in memory.
+#' @return A vault handle with attached sample metadata. Assign the result.
+#' @export
+set_sample_metadata <- function(vault, metadata) {
+    connection <- vault_connection(vault)
+    if (!is.data.frame(metadata) || !"sample_name" %in% names(metadata)) {
+        stop("metadata must be a data frame with a sample_name column", call. = FALSE)
+    }
+    sample_names <- metadata$sample_name
+    if (!is.character(sample_names) || anyNA(sample_names) || any(!nzchar(sample_names)) || anyDuplicated(sample_names)) {
+        stop("metadata sample_name must contain unique, nonempty strings", call. = FALSE)
+    }
+    known <- DBI::dbGetQuery(connection, "SELECT sample_name FROM samples")$sample_name
+    if (!all(sample_names %in% known)) {
+        stop("metadata sample_name contains names absent from the vault", call. = FALSE)
+    }
+    if ("sample_id" %in% names(metadata)) {
+        labels <- metadata$sample_id
+        if (!is.character(labels) || anyNA(labels) || any(!nzchar(labels)) || anyDuplicated(labels)) {
+            stop("metadata sample_id must contain unique, nonempty strings", call. = FALSE)
+        }
+        displayed <- c(labels, setdiff(known, sample_names))
+        if (anyDuplicated(displayed)) {
+            stop("metadata sample_id conflicts with an unlabeled sample_name", call. = FALSE)
+        }
+    }
+    vault$sample_metadata <- tibble::as_tibble(metadata)
+    vault
+}
+
+#' Read sample metadata attached to a vault handle
+#'
+#' @inheritParams close_vault
+#' @return The in-memory metadata table, or NULL when none is attached.
+#' @export
+sample_metadata <- function(vault) {
+    vault_connection(vault)
+    vault$sample_metadata
+}
+
+vault_sample_labels <- function(vault) {
+    metadata <- sample_metadata(vault)
+    if (is.null(metadata) || !"sample_id" %in% names(metadata)) return(NULL)
+    stats::setNames(metadata$sample_id, metadata$sample_name)
 }
 
 #' Close a ProteoVault connection

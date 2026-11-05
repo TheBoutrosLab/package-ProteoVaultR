@@ -33,7 +33,7 @@ plot <- plot_protein_coverage(
     vault = vault,
     accession = "P1",
     samples = c("S1", "S2"),
-    row_width = 50L
+    row_width = 10
 )
 plot
 close_vault(vault)

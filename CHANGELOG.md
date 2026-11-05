@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Attach sample metadata to vault objects in memory and use sample IDs in quantity plot labels.
 - Read ProteoVault schema 1.1.0 and expose UniProt protein annotations through `tbl_protein_identifiers()`.
 
 - Use source group labels as default protein matrix row names and allow selecting internal group IDs and duplicate handling.

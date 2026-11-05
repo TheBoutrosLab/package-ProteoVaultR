@@ -23,7 +23,9 @@ plot_precursor_quantity_distribution(
 \item{source_id}{Optional source identifier. For \code{"both"}, provide a named
 vector with \code{normalized} and \code{raw} source IDs if selection is ambiguous.}
 
-\item{samples}{Optional sample names to select and order.}
+\item{samples}{Optional sample names to select and order.
+Attached \code{sample_id} metadata changes x axis labels, while selection
+continues to use the original sample names.}
 
 \item{max_q_value}{Optional inclusive run-specific precursor q-value cutoff
 between 0 and 1. Requires the \code{quant-details} layer. Cannot recover rows
