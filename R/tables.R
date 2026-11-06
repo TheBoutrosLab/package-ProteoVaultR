@@ -1,3 +1,24 @@
+#' List tables and views in a vault
+#'
+#' Returns the names of physical tables and views in the vault's `main` schema.
+#' The result reflects the open database, including optional imported layers.
+#' Pass one of the returned names to [tbl_vault()] to query it.
+#'
+#' @inheritParams close_vault
+#' @return A sorted character vector of table and view names.
+#' @export
+list_vault_tables <- function(vault) {
+    DBI::dbGetQuery(
+        conn = vault_connection(vault),
+        statement = paste(
+            "SELECT table_name FROM information_schema.tables",
+            "WHERE table_schema = 'main'",
+            "ORDER BY table_name"
+        )
+    )$table_name
+}
+
+
 #' Access a saved table or view lazily
 #'
 #' This escape hatch exposes the schema without loading an entire table into R.

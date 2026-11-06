@@ -29,7 +29,7 @@ precursor_plot
 protein_plot
 ```
 
-For raw precursor quantities or a `max_q_value` filter, the vault needs `quant-details`. The cutoff only filters rows present in the DIA-NN report; it cannot restore rows DIA-NN omitted.
+Raw precursor quantities and a `max_q_value` filter use the DIA-NN report imported during the core build. The cutoff only filters rows present in the report; it cannot restore rows DIA-NN omitted.
 
 ```{r}
 raw_plot <- plot_precursor_quantity_distribution(
@@ -42,7 +42,7 @@ raw_plot
 close_vault(vault)
 ```
 
-The fixture includes a small `quant-details` source. A production vault needs the optional `quant-details` layer for raw quantities or a `max_q_value` filter. The optional `qc` layer contains published cohort QC metrics. Inspect available metric names before plotting; they depend on the QC pipeline output.
+The fixture includes a small DIA-NN report source. A production vault needs that report for raw quantities or a `max_q_value` filter. The optional `qc` layer contains published cohort QC metrics. Inspect available metric names before plotting; they depend on the QC pipeline output.
 
 ```{r, eval=FALSE}
 metrics <- tbl_qc_metrics(vault = vault)

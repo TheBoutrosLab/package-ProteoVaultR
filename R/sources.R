@@ -19,16 +19,6 @@ resolve_quant_source <- function(vault, level, source_id = NULL, method = "matri
     if (length(method) != 1L || is.na(method) || !nzchar(method)) {
         stop("method must select one recorded measurement method", call. = FALSE)
     }
-    if (
-        level == "precursor" &&
-        method %in% c(
-            "Precursor.Quantity",
-            "Precursor.Normalised",
-            "Precursor.Translated"
-        )
-    ) {
-        require_layer(vault = vault, layer = "quant-details")
-    }
     table <- if (level == "protein_group") "protein_quant" else "precursor_quant"
     table <- paste0(table, "_readable")
     recorded <- DBI::dbGetQuery(

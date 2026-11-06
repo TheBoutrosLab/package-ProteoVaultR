@@ -9,7 +9,7 @@ vignette: >
 
 ## Optional layers and interpretation
 
-Schema 1.1.0 keeps DIA-NN matrices in core. Full report quantities require `proteovault add-layer DATABASE --layer quant-details`.
+Core builds include DIA-NN matrix quantities and available protein-group and precursor report quantities.
 
 Protein sequences can be added to an existing vault with
 `proteovault add-fasta DATABASE --fasta SEARCH_DATABASE.fasta`. The imported

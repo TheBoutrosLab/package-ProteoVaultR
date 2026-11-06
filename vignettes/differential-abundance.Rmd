@@ -1,0 +1,231 @@
+---
+title: "Differential abundance with limma"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Differential abundance with limma}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Overview
+
+`fit_limma()` fits a limma linear model to a numeric assay in a
+`SummarizedExperiment`. Use `as_summarized_experiment()` to export one
+ProteoVault measurement source and method. The assay has features in rows and
+samples in columns; in-memory sample metadata becomes `colData`, which supplies
+the experimental conditions for the design.
+
+The default analysis converts positive intensities to log2 values, treats zero
+as missing, fits `limma::lmFit()`, applies `limma::contrasts.fit()`, and
+moderates variances with `limma::eBayes()`. It does not normalize, impute, or
+select significant features automatically. See the
+[limma User's Guide](https://bioconductor.org/packages/release/bioc/vignettes/limma/inst/doc/usersguide.pdf)
+for the underlying statistical model.
+
+## Prepare samples and one quantity assay
+
+The metadata `sample_name` values must exactly match the vault. List the
+stored names before preparing a mapping. The example below assumes a
+`sample_info` data frame with one row per sample and columns `sample_name`,
+`sample_id`, and `condition`.
+
+```{r, eval=FALSE}
+library(ProteoVaultR)
+
+vault <- open_vault("P2042.proteovault.duckdb")
+sample_names <- dplyr::collect(
+    dplyr::select(tbl_vault(vault, "samples"), sample_name)
+)
+print(sample_names)
+
+vault <- set_sample_metadata(vault, sample_info)
+se <- as_summarized_experiment(
+    vault,
+    level = "protein_group",
+    method = "PG.MaxLFQ"
+)
+
+table(SummarizedExperiment::colData(se)$condition)
+SummarizedExperiment::assayNames(se)
+close_vault(vault)
+```
+
+Choose one `source_id` when the requested method exists in multiple sources.
+`as_summarized_experiment()` preserves the chosen source and method in its
+metadata. A peptide-level assay is derived from precursor quantities and
+requires an explicit `peptide_aggregation`; it is not a separately measured
+peptide quantity.
+
+## Label-blind stable-reference normalization
+
+These functions select complete, abundant reference proteins without using
+sample groups. Supply raw protein intensities and exclude prespecified target
+proteins from reference selection. Each function adds a separate assay on the
+original intensity scale, so `fit_limma()` can apply its usual log2 transform.
+
+```{r, eval=FALSE}
+se <- as_summarized_experiment(vault, level = "protein_group",
+    method = "PG.Quantity")
+se <- normalize_stable_reference_genorm(se,
+    exclude = c("sp|P48426|PI42A_HUMAN", "sp|P78356|PI42B_HUMAN"))
+se <- normalize_stable_reference_pca(se,
+    exclude = c("sp|P48426|PI42A_HUMAN", "sp|P78356|PI42B_HUMAN"))
+
+SummarizedExperiment::assayNames(se)
+SummarizedExperiment::colData(se)$reference_genorm_log2_offset
+SummarizedExperiment::rowData(se)$reference_pca_selected
+
+plot_stable_reference_diagnostics(se, method = "genorm")
+plot_stable_reference_diagnostics(se, method = "pca", style = "ggplot2")
+```
+
+The geNorm-style and PCA selections are alternative sensitivity analyses.
+Their selected feature IDs and settings are stored in `metadata(se)`.
+
+## Compare one treatment with DMSO
+
+Suppose `condition` contains `DMSO`, `SBI-9456`, and other treatments. The
+formula `~ 0 + condition` estimates one mean per condition. The contrast below
+tests SBI-9456 against DMSO while retaining the other treatments in the model.
+
+```{r, eval=FALSE}
+se$condition <- factor(se$condition,
+    levels = c("DMSO", "SBI-9456", "OtherTreatment"))
+
+available <- list_limma_contrasts(se, "~ 0 + condition")
+available
+
+fit <- fit_limma(
+    se,
+    design = ~ 0 + condition,
+    contrasts = c(SBI_vs_DMSO = "conditionSBI.9456 - conditionDMSO")
+)
+
+colnames(fit$design)
+fit$contrast_matrix
+head(fit$results)
+```
+
+The function makes design column names valid R names. Thus `SBI-9456` becomes
+`SBI.9456` in a contrast. Check `colnames(fit$design)` if an expression does
+not match. The contrast direction is treatment minus DMSO: positive `logFC`
+means higher treatment abundance. Because the input is log2 transformed by
+default, `logFC = 1` corresponds to a twofold difference.
+
+For several comparisons, provide several named expressions. Each is tested
+against the same fitted design, and the results contain a `contrast` column.
+
+```{r, eval=FALSE}
+fit <- fit_limma(
+    se,
+    design = ~ 0 + condition,
+    contrasts = c(
+        SBI_vs_DMSO = "conditionSBI.9456 - conditionDMSO",
+        Other_vs_DMSO = "conditionOtherTreatment - conditionDMSO"
+    )
+)
+```
+
+## Interpret and inspect results
+
+`fit$results` has one row per feature and contrast, in assay feature order.
+`feature_id` matches the assay row name. It includes `logFC`, `AveExpr`, `t`,
+`P.Value`, `adj.P.Val` (Benjamini–Hochberg adjustment within each contrast),
+`B`, and available feature annotations. Protein-group members and mapped IDs
+remain list columns; their many-to-many mappings do not duplicate tests.
+
+```{r, eval=FALSE}
+significant <- subset(fit$results,
+    contrast == "SBI_vs_DMSO" & adj.P.Val < 0.05)
+significant[order(significant$adj.P.Val),
+    c("feature_id", "source_group_id", "logFC", "P.Value", "adj.P.Val")]
+```
+
+`fit$fit` is the moderated limma fit, `fit$design` is the exact design matrix,
+`fit$contrast_matrix` records the comparisons, and `fit$settings` records
+transformation and moderation options. The result includes all tested features;
+the example threshold above is applied only for display.
+
+## Volcano plots
+
+`plot_limma_volcano()` displays log2 fold change against a transformed
+probability axis.
+It defaults to BH-adjusted q-values and the BPG style; select `"p_value"` for
+unadjusted p-values or `style = "ggplot2"` for a ggplot object. Values are
+positioned and labeled as `-log10(probability)`: `0`, `1`, `2`, and so forth.
+There are no grid lines.
+
+```{r, eval=FALSE}
+plot_limma_volcano(
+    fit,
+    contrast = "SBI_vs_DMSO",
+    significance = "q_value",
+    proteins = c("O75083", "P12345"),
+    label_by = "leading_gene_name"
+)
+
+plot_limma_volcano(
+    fit,
+    contrast = "SBI_vs_DMSO",
+    significance = "p_value",
+    style = "ggplot2"
+)
+```
+
+`proteins` can contain exact feature IDs, complete protein-group names, group
+member accessions or names, or mapped identifiers. One identifier can match
+several groups, in which case all matching points are labeled. An unmatched
+identifier raises an error. The legend title identifies the selected probability
+type and shows `> cutoff`, `≤ cutoff; FC < 0`, and `≤ cutoff; FC ≥ 0`.
+Points at or below `cutoff` (default `0.05`) are colored by fold-change direction.
+Use `label_by` to display a character `rowData` column instead of the selected
+accession. Selected features need a value in that column. Nearby labels are
+placed at different heights to make them easier to read.
+Annotated points are orange, drawn over the other points, and connected to their labels.
+
+## Protein precursor profiles
+
+`plot_protein_precursor_quantity_lineplot()` shows every linked charged modified peptide for
+the selected proteins. Names on the protein vector become facet labels; the
+quantification method chooses the precursor measurements.
+
+```{r, eval=FALSE}
+plot_protein_precursor_quantity_lineplot(vault,
+    proteins = c(PIP4K2A = "sp|P48426|PI42A_HUMAN",
+        PIP4K2B = "sp|P78356|PI42B_HUMAN"),
+    method = "Precursor.Normalised")
+```
+
+## P-value histogram
+
+`plot_limma_pvalue_histogram()` shows the raw p-value distribution for one
+contrast. Both styles use equal-width bins from 0 to 1; `bins` controls the
+number of bins.
+
+```{r, eval=FALSE}
+plot_limma_pvalue_histogram(fit, contrast = "SBI_vs_DMSO")
+plot_limma_pvalue_histogram(fit, contrast = "SBI_vs_DMSO",
+    bins = 20, style = "ggplot2")
+```
+Missing statistics are omitted; a stored probability of zero is drawn just
+above the smallest positive probability so the plot remains finite.
+
+## Input and design checks
+
+- The selected assay must contain comparable measurements from one source and
+  quantification method. Do not combine raw and normalized methods in one fit.
+- With `log2_transform = TRUE`, zeros become missing by default; negative and
+  infinite intensities are rejected. No pseudocount or imputation is applied.
+- Set `log2_transform = FALSE` for an assay that is already on a log2 scale.
+  Zeros are then retained unless `zero_as_missing = TRUE` is requested.
+- The design must have one row per sample, full column rank, and residual
+  degrees of freedom. Missing design variables cause an error.
+- Missing feature values are passed to limma. Inspect feature coverage before
+  interpreting a contrast, especially if one group has few observed values.
+- `trend = TRUE` enables limma's mean-variance trend; `robust = TRUE` enables
+  robust empirical Bayes moderation. Use them based on diagnostics, not as
+  automatic defaults.
+
+The same interface accepts `level = "precursor"` or a peptide assay exported
+with an explicit precursor aggregation rule. These levels answer different
+biological questions; a precursor result is not a peptide or protein result.

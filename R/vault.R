@@ -296,7 +296,6 @@ vault_info <- function(vault) {
     vault_connection(vault = vault)
     stage_layers <- c(
         quantitation = "core",
-        `quant-details` = "quant-details",
         validation = "core",
         inference = "core",
         search = "raw-search",

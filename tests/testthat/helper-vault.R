@@ -25,7 +25,7 @@ make_test_vault <- function(optional = FALSE, path = tempfile(fileext = ".duckdb
     sources <- list(
         s_pg = c("diann_pg_matrix", "quantitation"),
         s_pr = c("diann_pr_matrix", "quantitation"),
-        s_report = c("diann_report", "quant-details"),
+        s_report = c("diann_report", "quantitation"),
         s_valid = c("idxml", "validation"),
         s_infer = c("idxml", "inference")
     )
