@@ -87,7 +87,8 @@ set_sample_metadata <- function(vault, metadata) {
         stop("metadata must be a data frame with a sample_name column", call. = FALSE)
     }
     sample_names <- metadata$sample_name
-    if (!is.character(sample_names) || anyNA(sample_names) || any(!nzchar(sample_names)) || anyDuplicated(sample_names)) {
+    if (!is.character(sample_names) || anyNA(sample_names) ||
+        any(!nzchar(sample_names)) || anyDuplicated(sample_names)) {
         stop("metadata sample_name must contain unique, nonempty strings", call. = FALSE)
     }
     known <- DBI::dbGetQuery(connection, "SELECT sample_name FROM samples")$sample_name

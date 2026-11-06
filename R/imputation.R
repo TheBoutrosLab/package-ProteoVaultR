@@ -49,8 +49,9 @@ impute_conditional_lod <- function(se, bin, min_observed = 2L,
     })
     lod <- minima * lod_factor
     result <- observed
-    counts <- vapply(bins, function(group) rowSums(!is.na(observed[, groups == group,
-        drop = FALSE])), numeric(nrow(observed)))
+    counts <- vapply(bins, function(group) {
+        rowSums(!is.na(observed[, groups == group, drop = FALSE]))
+    }, numeric(nrow(observed)))
     if (is.null(dim(counts))) counts <- matrix(counts, ncol = 1L)
     eligible <- rowSums(counts >= min_observed) > 0L
     row_data <- SummarizedExperiment::rowData(se)

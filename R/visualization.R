@@ -271,8 +271,8 @@ plot_limma_volcano <- function(
     data$negative_log10 <- -log10(pmax(data$probability, floor_value))
     cutoff_text <- format(cutoff, trim = TRUE, scientific = FALSE)
     legend_labels <- c(paste0("> ", cutoff_text),
-        paste0("≤ ", cutoff_text, "; FC < 0"),
-        paste0("≤ ", cutoff_text, "; FC ≥ 0"))
+        paste0("\u2264 ", cutoff_text, "; FC < 0"),
+        paste0("\u2264 ", cutoff_text, "; FC \u2265 0"))
     legend_title <- if (color_by == "q_value") "q-value" else "p-value"
     data$significant <- factor(
         ifelse(data$color_probability > cutoff, legend_labels[[1L]],

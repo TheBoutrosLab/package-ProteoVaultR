@@ -62,21 +62,27 @@ normalize_stable_reference <- function(se, method, assay, output_assay, exclude,
         stop("output_assay must name a new assay", call. = FALSE)
     if (!is.character(exclude) || anyNA(exclude))
         stop("exclude must contain feature IDs", call. = FALSE)
-    valid_count <- function(value) is.numeric(value) && length(value) == 1L &&
-        is.finite(value) && value >= 1L && value <= .Machine$integer.max &&
-        value == as.integer(value)
+    valid_count <- function(value) {
+        is.numeric(value) && length(value) == 1L &&
+            is.finite(value) && value >= 1L && value <= .Machine$integer.max &&
+            value == as.integer(value)
+    }
     if (!valid_count(candidate_count) || !valid_count(reference_count) ||
         candidate_count < reference_count)
-        stop("candidate_count and reference_count must be positive integers, with candidate_count >= reference_count", call. = FALSE)
+        stop("candidate_count and reference_count must be positive integers, ",
+            "with candidate_count >= reference_count", call. = FALSE)
     values <- SummarizedExperiment::assay(se, assay)
     if (!is.matrix(values) || !is.numeric(values) || ncol(values) < 2L ||
         is.null(rownames(values)) || anyDuplicated(rownames(values)) ||
         any(values < 0 | is.infinite(values), na.rm = TRUE))
-        stop("assay must have distinct feature IDs, at least two samples, and nonnegative finite intensities", call. = FALSE)
+        stop("assay must have distinct feature IDs, at least two samples, ",
+            "and nonnegative finite intensities", call. = FALSE)
     source_groups <- if ("source_group_id" %in%
         names(SummarizedExperiment::rowData(se))) {
         as.character(SummarizedExperiment::rowData(se)$source_group_id)
-    } else rep(NA_character_, nrow(se))
+    } else {
+        rep(NA_character_, nrow(se))
+    }
     known <- c(rownames(values), source_groups)
     if (any(!exclude %in% known))
         stop("Unmatched exclude values: ",
@@ -92,7 +98,7 @@ normalize_stable_reference <- function(se, method, assay, output_assay, exclude,
     if (nrow(candidates) < reference_count)
         stop("Fewer complete, nonexcluded candidates than reference_count", call. = FALSE)
     ordered <- order(-rowMeans(candidates), rownames(candidates))
-    candidates <- candidates[head(ordered, candidate_count), , drop = FALSE]
+    candidates <- candidates[utils::head(ordered, candidate_count), , drop = FALSE]
     centered <- sweep(candidates, 1L, rowMeans(candidates), "-")
     diagnostics <- list()
     if (method == "genorm") {

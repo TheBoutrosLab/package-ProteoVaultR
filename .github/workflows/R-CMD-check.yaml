@@ -18,5 +18,7 @@ jobs:
       - uses: r-lib/actions/setup-pandoc@v2
       - name: Install R dependencies
         run: |
-          Rscript -e 'install.packages(c("remotes", "rcmdcheck")); remotes::install_deps(dependencies = TRUE)'
+          Rscript -e 'install.packages(c("remotes", "rcmdcheck", "BiocManager"))'
+          Rscript -e 'BiocManager::install(c("limma", "S4Vectors", "SummarizedExperiment"), ask = FALSE, update = FALSE)'
+          Rscript -e 'remotes::install_deps(dependencies = TRUE)'
       - uses: r-lib/actions/check-r-package@v2
