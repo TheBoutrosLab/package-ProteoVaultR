@@ -6,6 +6,8 @@ test_that("wrong formats, versions, and missing columns are rejected", {
     edit_test_vault(path, "UPDATE metadata SET value='9.0.0' WHERE key='schema_version'")
     expect_error(open_vault(path), "Unsupported ProteoVault schema")
     edit_test_vault(path, "UPDATE metadata SET value='1.0.0' WHERE key='schema_version'")
+    expect_error(open_vault(path), "Unsupported ProteoVault schema")
+    edit_test_vault(path, "UPDATE metadata SET value='1.1.0' WHERE key='schema_version'")
     edit_test_vault(path, "DROP VIEW protein_quant_long")
     expect_error(open_vault(path), "Missing schema columns")
 })

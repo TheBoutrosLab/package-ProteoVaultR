@@ -12,7 +12,8 @@ plot_qc_boxplot(
   source_process = NULL,
   search_engine = NULL,
   fraction_id = NULL,
-  style = c("ggplot2", "BPG")
+  style = c("ggplot2", "BPG"),
+  levels = NULL
 )
 }
 \arguments{
@@ -33,6 +34,9 @@ with \code{*}.}
 
 \item{style}{Plotting style: \code{ggplot2} or \code{BPG}. The BPG style uses
 \code{lattice::bwplot()} with a panel drawn from the supplied quantiles.}
+
+\item{levels}{Optional group levels to plot, in display order. For example,
+\code{c("target", "decoy")} excludes the \code{"all"} group.}
 }
 \value{
 A ggplot object or lattice trellis plot, according to \code{style}.

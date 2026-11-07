@@ -32,6 +32,11 @@ test_that("precursor quantity distributions use all measured precursors", {
     expect_setequal(as.character(unique(boxplot$data$precursor_id)), c("51", "52"))
     expect_equal(nrow(violin$data), 3L)
     expect_equal(boxplot$data$log2_quantity, log2(boxplot$data$quantity))
+    raw_plot <- plot_precursor_quantity_distribution(vault, transform = "none")
+    expect_equal(nrow(raw_plot$data), 4L)
+    expect_true(0 %in% raw_plot$data$quantity)
+    expect_equal(raw_plot$data$plot_quantity, raw_plot$data$quantity)
+    expect_equal(raw_plot$labels$y, "precursor quantity")
     expect_silent(ggplot2::ggplot_build(boxplot))
     expect_s3_class(violin$layers[[1L]]$geom, "GeomViolin")
 
@@ -49,7 +54,25 @@ test_that("precursor quantity distributions use all measured precursors", {
     )
 })
 
-test_that("normalized distribution works without quant-details", {
+test_that("precursor distribution selects an exact report method", {
+    path <- make_test_vault()
+    edit_test_vault(path, "INSERT INTO quant_methods VALUES (3,'Precursor.Translated')")
+    edit_test_vault(path,
+        "INSERT INTO precursor_quant VALUES (51,111,103,3,25,0.005,0.002)")
+    vault <- open_vault(path)
+    on.exit(close_vault(vault), add = TRUE)
+
+    plot <- plot_precursor_quantity_distribution(vault,
+        method = "Precursor.Translated")
+    expect_equal(plot$data$quantity, 25)
+    expect_equal(as.character(plot$data$quantity_type), "Precursor.Translated")
+    expect_error(plot_precursor_quantity_distribution(vault,
+        quantity_type = "raw", method = "Precursor.Translated"), "either")
+    expect_error(plot_precursor_quantity_distribution(vault,
+        method = "matrix", max_q_value = 0.05), "report")
+})
+
+test_that("normalized distribution works without report quantities", {
     path <- make_test_vault()
     edit_test_vault(
         path = path,
@@ -78,14 +101,14 @@ test_that("normalized distribution works without quant-details", {
             vault = vault,
             quantity_type = "raw"
         ),
-        "quant-details"
+        "compatible precursor source"
     )
     expect_error(
         plot_precursor_quantity_distribution(
             vault = vault,
             max_q_value = 0.05
         ),
-        "quant-details"
+        "compatible precursor source"
     )
 })
 

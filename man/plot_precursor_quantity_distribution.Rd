@@ -10,7 +10,9 @@ plot_precursor_quantity_distribution(
   plot_type = c("boxplot", "violin"),
   source_id = NULL,
   samples = NULL,
-  max_q_value = NULL
+  max_q_value = NULL,
+  method = NULL,
+  transform = c("log2", "none")
 )
 }
 \arguments{
@@ -23,18 +25,26 @@ plot_precursor_quantity_distribution(
 \item{source_id}{Optional source identifier. For \code{"both"}, provide a named
 vector with \code{normalized} and \code{raw} source IDs if selection is ambiguous.}
 
-\item{samples}{Optional sample names to select and order.}
+\item{samples}{Optional sample names to select and order.
+Attached \code{sample_id} metadata changes x axis labels, while selection
+continues to use the original sample names.}
 
 \item{max_q_value}{Optional inclusive run-specific precursor q-value cutoff
-between 0 and 1. Requires the \code{quant-details} layer. Cannot recover rows
+between 0 and 1. Requires DIA-NN report quantities. Cannot recover rows
 omitted by DIA-NN when it generated the report.}
+
+\item{method}{Optional exact precursor quantification method, such as
+\code{"matrix"}, \code{"Precursor.Quantity"}, \code{"Precursor.Normalised"}, or
+\code{"Precursor.Translated"}. Cannot be combined with \code{quantity_type}.}
+
+\item{transform}{\code{"log2"} (default) or \code{"none"} to plot original quantities.}
 }
 \value{
-A ggplot object. Quantities are displayed on a log2 scale.
+A ggplot object. Quantities use the selected transformation.
 }
 \description{
-Normalized quantities come from the core DIA-NN precursor matrix unless
-\code{max_q_value} is set. A q-value cutoff selects the optional DIA-NN report
-(\code{quant-details} layer), as do raw quantities.
+By default, normalized quantities come from the DIA-NN precursor matrix
+unless \code{max_q_value} is set. A q-value cutoff selects the DIA-NN report,
+as do raw quantities. Use \code{method} to select one recorded method directly.
 Nonpositive and missing quantities are excluded before taking log2.
 }

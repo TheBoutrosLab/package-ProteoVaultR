@@ -2,21 +2,27 @@
 
 #' Plot precursor quantity distributions by sample
 #'
-#' Normalized quantities come from the core DIA-NN precursor matrix unless
-#' `max_q_value` is set. A q-value cutoff selects the optional DIA-NN report
-#' (`quant-details` layer), as do raw quantities.
+#' By default, normalized quantities come from the DIA-NN precursor matrix
+#' unless `max_q_value` is set. A q-value cutoff selects the DIA-NN report,
+#' as do raw quantities. Use `method` to select one recorded method directly.
 #' Nonpositive and missing quantities are excluded before taking log2.
 #'
 #' @param vault An open ProteoVault connection returned by [open_vault()].
 #' @param quantity_type `"normalized"`, `"raw"`, or `"both"`.
+#' @param method Optional exact precursor quantification method, such as
+#'   `"matrix"`, `"Precursor.Quantity"`, `"Precursor.Normalised"`, or
+#'   `"Precursor.Translated"`. Cannot be combined with `quantity_type`.
+#' @param transform `"log2"` (default) or `"none"` to plot original quantities.
 #' @param plot_type `"boxplot"` or `"violin"`.
 #' @param source_id Optional source identifier. For `"both"`, provide a named
 #'   vector with `normalized` and `raw` source IDs if selection is ambiguous.
 #' @param samples Optional sample names to select and order.
+#'   Attached `sample_id` metadata changes x axis labels, while selection
+#'   continues to use the original sample names.
 #' @param max_q_value Optional inclusive run-specific precursor q-value cutoff
-#'   between 0 and 1. Requires the `quant-details` layer. Cannot recover rows
+#'   between 0 and 1. Requires DIA-NN report quantities. Cannot recover rows
 #'   omitted by DIA-NN when it generated the report.
-#' @return A ggplot object. Quantities are displayed on a log2 scale.
+#' @return A ggplot object. Quantities use the selected transformation.
 #' @export
 plot_precursor_quantity_distribution <- function(
     vault,
@@ -24,14 +30,28 @@ plot_precursor_quantity_distribution <- function(
     plot_type = c("boxplot", "violin"),
     source_id = NULL,
     samples = NULL,
-    max_q_value = NULL
+    max_q_value = NULL,
+    method = NULL,
+    transform = c("log2", "none")
 ) {
+    transform <- match.arg(transform)
+    if (!is.null(method) && !missing(quantity_type)) {
+        stop("Specify either method or quantity_type, not both", call. = FALSE)
+    }
+    if (!is.null(method) &&
+        (!is.character(method) || length(method) != 1L ||
+            is.na(method) || !nzchar(method))) {
+        stop("method must be one nonempty quantification method", call. = FALSE)
+    }
     quantity_type <- match.arg(arg = quantity_type)
     plot_type <- match.arg(arg = plot_type)
     if (!is.null(max_q_value) &&
         (!is.numeric(max_q_value) || length(max_q_value) != 1L ||
             !is.finite(max_q_value) || max_q_value < 0 || max_q_value > 1)) {
         stop("max_q_value must be one number between 0 and 1", call. = FALSE)
+    }
+    if (!is.null(method) && identical(method, "matrix") && !is.null(max_q_value)) {
+        stop("max_q_value requires a report quantification method", call. = FALSE)
     }
 
     methods <- c(
@@ -42,7 +62,9 @@ plot_precursor_quantity_distribution <- function(
         },
         raw = "Precursor.Quantity"
     )
-    selected_types <- if (quantity_type == "both") {
+    selected_types <- if (!is.null(method)) {
+        method
+    } else if (quantity_type == "both") {
         c("raw", "normalized")
     } else {
         quantity_type
@@ -56,7 +78,7 @@ plot_precursor_quantity_distribution <- function(
         )
     }
     quantities <- lapply(selected_types, function(type) {
-        method <- methods[[type]]
+        selected_method <- if (is.null(method)) methods[[type]] else method
         selected_source <- if (quantity_type == "both") {
             if (is.null(source_id)) NULL else source_id[[type]]
         } else {
@@ -65,7 +87,7 @@ plot_precursor_quantity_distribution <- function(
         query <- tbl_precursor_quant(
             vault = vault,
             source_id = selected_source,
-            method = method
+            method = selected_method
         )
         if (!is.null(max_q_value)) {
             query <- query %>%
@@ -87,44 +109,57 @@ plot_precursor_quantity_distribution <- function(
         samples = samples,
         plot_type = plot_type,
         quantity_types = selected_types,
-        label = "precursor"
+        label = "precursor",
+        sample_labels = vault_sample_labels(vault),
+        transform = transform
     )
 }
 
 #' Plot protein-group quantity distributions by sample
 #'
-#' Uses the normalized DIA-NN protein-group matrix. Nonpositive and missing
-#' quantities are excluded before taking log2.
+#' Uses the DIA-NN protein-group matrix by default. Select a recorded report
+#' quantity with `method`. Nonpositive and missing quantities are excluded
+#' before taking log2.
 #'
 #' @param vault An open ProteoVault connection returned by [open_vault()].
 #' @param plot_type `"boxplot"` or `"violin"`.
-#' @param source_id Optional DIA-NN protein-group matrix source identifier.
+#' @param source_id Optional protein-group quantification source identifier.
+#' @param method Exact protein-group quantification method, such as `"matrix"`,
+#'   `"PG.Quantity"`, `"PG.Normalised"`, `"PG.MaxLFQ"`, or `"PG.TopN"`.
+#' @param transform `"log2"` (default) or `"none"` to plot original quantities.
 #' @param samples Optional sample names to select and order.
-#' @return A ggplot object. Quantities are displayed on a log2 scale.
+#'   Attached `sample_id` metadata changes x axis labels, while selection
+#'   continues to use the original sample names.
+#' @return A ggplot object. Quantities use the selected transformation.
 #' @export
 plot_protein_quantity_distribution <- function(
     vault,
     plot_type = c("boxplot", "violin"),
     source_id = NULL,
-    samples = NULL
+    samples = NULL,
+    method = "matrix",
+    transform = c("log2", "none")
 ) {
     plot_type <- match.arg(arg = plot_type)
+    transform <- match.arg(transform)
     quantities <- tbl_protein_quant(
         vault = vault,
         source_id = source_id,
-        method = "matrix"
+        method = method
     ) %>%
         dplyr::select(dplyr::all_of(c(
             "sample_name", "group_id", "quantity"
         ))) %>%
         dplyr::collect() %>%
-        dplyr::mutate(quantity_type = "normalized")
+        dplyr::mutate(quantity_type = .env$method)
     plot_quantity_distribution(
         quantities = quantities,
         samples = samples,
         plot_type = plot_type,
-        quantity_types = "normalized",
-        label = "protein-group"
+        quantity_types = method,
+        label = "protein-group",
+        sample_labels = vault_sample_labels(vault),
+        transform = transform
     )
 }
 
@@ -133,7 +168,9 @@ plot_quantity_distribution <- function(
     samples,
     plot_type,
     quantity_types,
-    label
+    label,
+    sample_labels = NULL,
+    transform = "log2"
 ) {
     available <- sort(unique(quantities$sample_name))
     if (is.null(samples)) {
@@ -149,10 +186,11 @@ plot_quantity_distribution <- function(
             .data$sample_name %in% .env$samples,
             !is.na(.data$quantity),
             is.finite(.data$quantity),
-            .data$quantity > 0
+            if (transform == "log2") .data$quantity > 0 else TRUE
         )
     if (!nrow(quantities)) {
-        stop("No positive ", label, " quantities match the selection", call. = FALSE)
+        stop("No ", if (transform == "log2") "positive " else "finite ",
+            label, " quantities match the selection", call. = FALSE)
     }
     quantities$sample_name <- factor(
         quantities$sample_name,
@@ -162,13 +200,18 @@ plot_quantity_distribution <- function(
         quantities$quantity_type,
         levels = quantity_types
     )
-    quantities$log2_quantity <- log2(quantities$quantity)
+    quantities$plot_quantity <- if (transform == "log2") {
+        log2(quantities$quantity)
+    } else {
+        quantities$quantity
+    }
+    if (transform == "log2") quantities$log2_quantity <- quantities$plot_quantity
 
     plot <- ggplot2::ggplot(
         data = quantities,
         mapping = ggplot2::aes(
             x = sample_name,
-            y = log2_quantity
+            y = .data$plot_quantity
         )
     )
     if (plot_type == "boxplot") {
@@ -192,10 +235,19 @@ plot_quantity_distribution <- function(
             ncol = 1
         )
     }
+    if (!is.null(sample_labels)) {
+        labels <- stats::setNames(samples, samples)
+        labels[names(sample_labels)] <- sample_labels
+        plot <- plot + ggplot2::scale_x_discrete(labels = labels)
+    }
     plot +
         ggplot2::labs(
             x = "Sample",
-            y = paste("Log2", label, "quantity")
+            y = if (transform == "log2") {
+                paste("Log2", label, "quantity")
+            } else {
+                paste(label, "quantity")
+            }
         ) +
         ggplot2::theme_bw(base_size = 12) +
         ggplot2::theme(
@@ -402,7 +454,7 @@ plot_qc_metric <- function(
                     position = ggplot2::position_dodge(width = 0.8),
                     width = 0.7,
                     colour = "black",
-                    linewidth = 0.3
+                    linewidth = 0.7
                 ) +
                 ggplot2::scale_fill_manual(values = colours, drop = FALSE) +
                 ggplot2::scale_x_discrete(
@@ -432,7 +484,7 @@ plot_qc_metric <- function(
             plot.horizontal = TRUE,
             col = unname(colours),
             border.col = "black",
-            border.lwd = 0.3,
+            border.lwd = 1,
             xlimits = xlimits,
             xlab.label = axis_label,
             ylab.label = NULL,
@@ -452,7 +504,7 @@ plot_qc_metric <- function(
             plot.horizontal = TRUE,
             col = unname(colours),
             border.col = "black",
-            border.lwd = 0.3,
+            border.lwd = 1,
             key = list(
                 rectangles = list(col = rev(unname(colours))),
                 text = list(lab = rev(group_order)),
@@ -486,6 +538,8 @@ plot_qc_metric <- function(
 #' @param source_process Optional process name, such as `MSBooster`.
 #' @param search_engine Optional search-engine name.
 #' @param fraction_id Optional fraction ID; pass it as a string.
+#' @param levels Optional group levels to plot, in display order. For example,
+#'   `c("target", "decoy")` excludes the `"all"` group.
 #' @param style Plotting style: `ggplot2` or `BPG`. The BPG style uses
 #'   `lattice::bwplot()` with a panel drawn from the supplied quantiles.
 #' @return A ggplot object or lattice trellis plot, according to `style`.
@@ -498,7 +552,8 @@ plot_qc_boxplot <- function(
     source_process = NULL,
     search_engine = NULL,
     fraction_id = NULL,
-    style = c("ggplot2", "BPG")
+    style = c("ggplot2", "BPG"),
+    levels = NULL
 ) {
     style <- match.arg(arg = style)
     if (!is.character(metric_name) || length(metric_name) != 1L ||
@@ -525,6 +580,14 @@ plot_qc_boxplot <- function(
     if (anyNA(metric$sample) || any(!nzchar(metric$sample)) ||
         anyNA(metric$group) || any(!nzchar(metric$group))) {
         stop("QC rows need a dataset or sample name and a group", call. = FALSE)
+    }
+    if (!is.null(levels)) {
+        if (!is.character(levels) || !length(levels) || anyNA(levels) ||
+            any(!nzchar(levels)) || anyDuplicated(levels) ||
+            !all(levels %in% metric$group)) {
+            stop("levels must select distinct groups present in the QC metric", call. = FALSE)
+        }
+        metric <- metric[metric$group %in% levels, , drop = FALSE]
     }
     metric$percentile <- sub("^.*_", "", metric$metric_name)
     if (anyDuplicated(metric[c("sample", "group", "percentile")])) {
@@ -569,13 +632,17 @@ plot_qc_boxplot <- function(
     summary <- do.call(rbind, summaries)
     rownames(summary) <- NULL
 
-    group_order <- c(
-        intersect(c("all", "target", "decoy", "unknown"), unique(summary$group)),
-        sort(setdiff(
-            unique(summary$group),
-            c("all", "target", "decoy", "unknown")
-        ))
-    )
+    group_order <- if (is.null(levels)) {
+        c(
+            intersect(c("all", "target", "decoy", "unknown"), unique(summary$group)),
+            sort(setdiff(
+                unique(summary$group),
+                c("all", "target", "decoy", "unknown")
+            ))
+        )
+    } else {
+        levels
+    }
     sample_order <- rev(sort(unique(summary$sample)))
     summary$sample <- factor(summary$sample, levels = sample_order)
     summary$group <- factor(summary$group, levels = group_order)
@@ -818,7 +885,7 @@ plot_qc_charge_psm_counts <- function(
                     position = ggplot2::position_dodge(width = 0.8),
                     width = 0.7,
                     colour = "black",
-                    linewidth = 0.3
+                    linewidth = 0.7
                 ) +
                 ggplot2::facet_grid(cols = ggplot2::vars(group), drop = FALSE) +
                 ggplot2::scale_fill_manual(
@@ -855,7 +922,7 @@ plot_qc_charge_psm_counts <- function(
         plot.horizontal = TRUE,
         col = colours,
         border.col = "black",
-        border.lwd = 0.3,
+        border.lwd = 1,
         key = list(
             rectangles = list(col = colours),
             text = list(lab = paste0("Charge ", charge_names)),

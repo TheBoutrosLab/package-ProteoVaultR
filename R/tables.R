@@ -1,3 +1,24 @@
+#' List tables and views in a vault
+#'
+#' Returns the names of physical tables and views in the vault's `main` schema.
+#' The result reflects the open database, including optional imported layers.
+#' Pass one of the returned names to [tbl_vault()] to query it.
+#'
+#' @inheritParams close_vault
+#' @return A sorted character vector of table and view names.
+#' @export
+list_vault_tables <- function(vault) {
+    DBI::dbGetQuery(
+        conn = vault_connection(vault),
+        statement = paste(
+            "SELECT table_name FROM information_schema.tables",
+            "WHERE table_schema = 'main'",
+            "ORDER BY table_name"
+        )
+    )$table_name
+}
+
+
 #' Access a saved table or view lazily
 #'
 #' This escape hatch exposes the schema without loading an entire table into R.
@@ -18,6 +39,7 @@ tbl_vault <- function(vault, name) {
         psm_features = "raw-search",
         psm_metadata = "raw-search",
         qc_metrics = "qc",
+        protein_identifiers = "uniprot-idmapping",
         NULL
     )
     if (!is.null(layer)) require_layer(vault = vault, layer = layer)
@@ -161,6 +183,36 @@ tbl_group_members <- function(
         dplyr::inner_join(y = groups, by = "group_id") %>%
         dplyr::inner_join(
             y = tbl_vault(vault = vault, name = "proteins"),
+            by = "protein_id"
+        )
+}
+
+
+#' Query protein identifier annotations
+#'
+#' Returns every mapped identifier in long form with the original protein
+#' accession and mapping-source provenance. A protein can have multiple values
+#' for the same mapping type. The query does not pick a representative value.
+#'
+#' @inheritParams close_vault
+#' @param source_id Optional mapping archive source identifier; NULL retains all.
+#' @param mapping_type Optional UniProt mapping type, such as `Gene_Name`,
+#'   `GeneID`, or `Ensembl`.
+#' @return A lazy dbplyr query with protein_id, accession, source_id,
+#'   source_accession, mapping_type, and mapped_id.
+#' @export
+tbl_protein_identifiers <- function(vault, source_id = NULL, mapping_type = NULL) {
+    identifiers <- tbl_vault(vault = vault, name = "protein_identifiers")
+    if (!is.null(source_id)) {
+        identifiers <- dplyr::filter(identifiers, .data$source_id %in% .env$source_id)
+    }
+    if (!is.null(mapping_type)) {
+        identifiers <- dplyr::filter(identifiers, .data$mapping_type %in% .env$mapping_type)
+    }
+    identifiers %>%
+        dplyr::inner_join(
+            y = tbl_vault(vault = vault, name = "proteins") %>%
+                dplyr::select(dplyr::all_of(c("protein_id", "accession"))),
             by = "protein_id"
         )
 }

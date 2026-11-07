@@ -15,7 +15,7 @@ test_that("shared proteins do not multiply PSMs and optional layers are explicit
 test_that("extended layers preserve stage scores and empty imports remain available", {
     path <- make_test_vault(optional = TRUE)
     vault <- open_vault(path)
-    expect_equal(vault_info(vault)$layers, c("core", "msbooster", "quant-details", "raw-search"))
+    expect_equal(vault_info(vault)$layers, c("core", "msbooster", "raw-search"))
     expect_equal(nrow(dplyr::collect(tbl_psms(vault))), 1L)
     expect_equal(nrow(dplyr::collect(tbl_psms(vault, stage = c("validation", "search")))), 2L)
     raw <- dplyr::collect(tbl_psm_scores(vault, stage = "search"))

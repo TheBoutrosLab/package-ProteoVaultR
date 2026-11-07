@@ -8,7 +8,9 @@ plot_protein_quantity_distribution(
   vault,
   plot_type = c("boxplot", "violin"),
   source_id = NULL,
-  samples = NULL
+  samples = NULL,
+  method = "matrix",
+  transform = c("log2", "none")
 )
 }
 \arguments{
@@ -16,14 +18,22 @@ plot_protein_quantity_distribution(
 
 \item{plot_type}{\code{"boxplot"} or \code{"violin"}.}
 
-\item{source_id}{Optional DIA-NN protein-group matrix source identifier.}
+\item{source_id}{Optional protein-group quantification source identifier.}
 
-\item{samples}{Optional sample names to select and order.}
+\item{samples}{Optional sample names to select and order.
+Attached \code{sample_id} metadata changes x axis labels, while selection
+continues to use the original sample names.}
+
+\item{method}{Exact protein-group quantification method, such as \code{"matrix"},
+\code{"PG.Quantity"}, \code{"PG.Normalised"}, \code{"PG.MaxLFQ"}, or \code{"PG.TopN"}.}
+
+\item{transform}{\code{"log2"} (default) or \code{"none"} to plot original quantities.}
 }
 \value{
-A ggplot object. Quantities are displayed on a log2 scale.
+A ggplot object. Quantities use the selected transformation.
 }
 \description{
-Uses the normalized DIA-NN protein-group matrix. Nonpositive and missing
-quantities are excluded before taking log2.
+Uses the DIA-NN protein-group matrix by default. Select a recorded report
+quantity with \code{method}. Nonpositive and missing quantities are excluded
+before taking log2.
 }
