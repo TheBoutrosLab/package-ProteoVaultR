@@ -16,7 +16,9 @@ test_that("DDA peptide and TMT schema are queryable", {
     edit_test_vault(path, "INSERT INTO quant_methods VALUES (4,'TMT.ScanBased')")
     edit_test_vault(path, "INSERT INTO grouping_methods VALUES (3,'ProteinQuantifier')")
     edit_test_vault(path, paste(
-        "INSERT INTO protein_groups (group_id,source_id,source_group_id,method_id,group_type,score,score_type,reported_n_proteins,reported_n_peptides) VALUES",
+        "INSERT INTO protein_groups ",
+        "(group_id,source_id,source_group_id,method_id,group_type,score,score_type,",
+        "reported_n_proteins,reported_n_peptides) VALUES",
         "(95,110,'P1/P2',3,'quantification',0.8,'protein_score',2,1)"
     ))
     edit_test_vault(path, "INSERT INTO protein_group_members VALUES (95,61),(95,62)")
@@ -29,7 +31,9 @@ test_that("DDA peptide and TMT schema are queryable", {
     edit_test_vault(path, "INSERT INTO spectra VALUES (72,24,'scan=8',130,2,510,2,104)")
     edit_test_vault(path, "INSERT INTO psms VALUES (83,72,51,'MSFragger',1,'target',104,2,0,1)")
     edit_test_vault(path, paste(
-        "INSERT INTO precursor_quant (quant_id,precursor_id,channel_id,source_id,method_id,quantity,source_element_id,source_map_id,rt_seconds,spectrum_id) VALUES",
+        "INSERT INTO precursor_quant ",
+        "(quant_id,precursor_id,channel_id,source_id,method_id,quantity,",
+        "source_element_id,source_map_id,rt_seconds,spectrum_id) VALUES",
         "(6,51,114,113,4,10,'e_1',0,120,72),",
         "(7,51,114,113,4,20,'e_2',0,180,72)"
     ))

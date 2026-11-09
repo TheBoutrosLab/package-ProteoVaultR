@@ -28,7 +28,13 @@ resolve_quant_source <- function(vault, level, source_id = NULL, method = NULL) 
     format <- if (method == "matrix") {
         if (level == "protein_group") "diann_pg_matrix" else "diann_pr_matrix"
     } else if (method == "ProteinQuantifier") {
-        if (level == "protein_group") "openms_protein_quant" else if (level == "peptide") "openms_peptide_quant" else character()
+        if (level == "protein_group") {
+            "openms_protein_quant"
+        } else if (level == "peptide") {
+            "openms_peptide_quant"
+        } else {
+            character()
+        }
     } else if (level == "precursor" && method %in% c(
         "Precursor.Quantity", "Precursor.Normalised", "Precursor.Translated"
     )) {

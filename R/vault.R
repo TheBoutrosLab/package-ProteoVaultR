@@ -224,8 +224,15 @@ vault_schema <- function() {
             "charge", "fraction"),
         peptide_quant = c("feature_id", "channel_id", "source_id", "method_id", "quantity"),
         peptide_quant_readable = c("feature_id", "channel_id", "source_id", "method", "quantity"),
-        precursor_quant = c("quant_id", "precursor_id", "channel_id", "source_id", "method_id", "quantity", "source_element_id", "source_map_id", "rt_seconds", "spectrum_id"),
-        precursor_quant_readable = c("quant_id", "precursor_id", "channel_id", "source_id", "method", "quantity", "rt_seconds"),
+        precursor_quant = c(
+            "quant_id", "precursor_id", "channel_id", "source_id", "method_id",
+            "quantity", "source_element_id", "source_map_id", "rt_seconds",
+            "spectrum_id"
+        ),
+        precursor_quant_readable = c(
+            "quant_id", "precursor_id", "channel_id", "source_id", "method",
+            "quantity", "rt_seconds"
+        ),
         quant_methods = c("method_id", "name"),
         quant_channels = c("channel_id", "sample_id", "run_id", "label"),
         tmt_plexes = c("plex_id", "plex_name", "reference_channel_id"),
