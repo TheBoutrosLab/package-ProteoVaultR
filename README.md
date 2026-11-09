@@ -29,6 +29,13 @@ close_vault(vault)
 `uniprot-idmapping` layer is present. It retains multiple mappings per protein
 and the mapping archive's `source_id`.
 
+For DDA ProteinQuantifier vaults, `tbl_peptide_quant()` and
+`matrix_peptide_abundance()` expose the native peptide measurements.
+`as_summarized_experiment(vault, level = "peptide")` uses those measurements
+directly. TMT reporter samples are named `<plex_id>|<reporter_label>`; plex,
+reporter, channel description, and acquisition runs are available in the
+exported sample metadata.
+
 Attach sample metadata to the R handle to show shorter IDs on quantity plots.
 The `sample_name` column must match the names stored in the vault. Assign the
 returned handle; the DuckDB file is unchanged.

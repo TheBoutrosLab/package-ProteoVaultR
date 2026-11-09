@@ -99,7 +99,7 @@ aggregate_duplicate_quantities <- function(values, duplicates) {
 matrix_protein_abundance <- function(
     vault,
     source_id = NULL,
-    method = "matrix",
+    method = NULL,
     samples = NULL,
     row_id = c("source_group_id", "group_id"),
     duplicates = c("best", "error", "sum", "mean")
@@ -120,7 +120,10 @@ matrix_protein_abundance <- function(
 #' Create a charged-peptidoform abundance matrix
 #'
 #' Row names are internal precursor IDs. This function does not collapse
-#' modifications or charge states into peptide quantities.
+#' modifications or charge states into peptide quantities. TMT can have several
+#' scan or feature observations for one precursor and channel; `duplicates`
+#' controls their aggregation. Use [tbl_precursor_quant()] to inspect each
+#' original observation and its retention time.
 #'
 #' @inheritParams tbl_precursor_quant
 #' @inheritParams matrix_quant
@@ -129,7 +132,7 @@ matrix_protein_abundance <- function(
 matrix_precursor_abundance <- function(
     vault,
     source_id = NULL,
-    method = "matrix",
+    method = NULL,
     samples = NULL,
     duplicates = c("best", "error", "sum", "mean")
 ) {
@@ -140,6 +143,31 @@ matrix_precursor_abundance <- function(
             method = method
         ),
         feature = "precursor_id",
+        samples = samples,
+        duplicates = duplicates
+    )
+}
+
+
+#' Create a native peptide abundance matrix
+#'
+#' Rows use source feature IDs, retaining separate modified peptide, charge,
+#' protein, and fraction records. Use [tbl_peptide_quant()] to inspect them.
+#'
+#' @inheritParams tbl_peptide_quant
+#' @inheritParams matrix_quant
+#' @return A numeric peptide-feature-by-sample matrix.
+#' @export
+matrix_peptide_abundance <- function(
+    vault,
+    source_id = NULL,
+    method = NULL,
+    samples = NULL,
+    duplicates = c("best", "error", "sum", "mean")
+) {
+    matrix_quant(
+        query = tbl_peptide_quant(vault, source_id, method),
+        feature = "feature_id",
         samples = samples,
         duplicates = duplicates
     )

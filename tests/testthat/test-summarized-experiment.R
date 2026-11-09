@@ -42,7 +42,7 @@ test_that("protein-group export keeps group quantities and one-to-many annotatio
 test_that("precursor and peptide exports preserve their distinct feature levels", {
     path <- make_test_vault()
     edit_test_vault(path,
-        "INSERT INTO protein_groups VALUES (96,102,'P1;P2',1,'quantification',NULL,NULL)")
+        "INSERT INTO protein_groups (group_id,source_id,source_group_id,method_id,group_type,score,score_type) VALUES (96,102,'P1;P2',1,'quantification',NULL,NULL)")
     edit_test_vault(path,
         "INSERT INTO protein_group_members VALUES (96,61),(96,62)")
     edit_test_vault(path, "INSERT INTO precursor_groups VALUES (51,96)")
@@ -93,7 +93,7 @@ test_that("peptide aggregation combines distinct precursors after sample resolut
         "INSERT INTO peptidoforms VALUES (43,31,'PEPTIDE[Oxidation]','DIA-NN')")
     edit_test_vault(path, "INSERT INTO precursors VALUES (53,43,2)")
     edit_test_vault(path,
-        "INSERT INTO precursor_quant VALUES (53,111,102,1,4,NULL,NULL)")
+        "INSERT INTO precursor_quant (quant_id,precursor_id,channel_id,source_id,method_id,quantity,q_value,pep) VALUES (6,53,111,102,1,4,NULL,NULL)")
     vault <- open_vault(path)
     on.exit(close_vault(vault), add = TRUE)
 

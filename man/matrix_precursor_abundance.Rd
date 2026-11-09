@@ -7,7 +7,7 @@
 matrix_precursor_abundance(
   vault,
   source_id = NULL,
-  method = "matrix",
+  method = NULL,
   samples = NULL,
   duplicates = c("best", "error", "sum", "mean")
 )
@@ -17,9 +17,9 @@ matrix_precursor_abundance(
 
 \item{source_id}{Optional source identifier from \code{vault_info(vault)$sources}.}
 
-\item{method}{Quantification method. \code{matrix} selects a saved matrix;
-precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normalised},
-and \code{Precursor.Translated}.}
+\item{method}{Quantification method. \code{NULL} selects \code{matrix} when present,
+otherwise the sole available method (such as \code{ProteinQuantifier}). Specify
+a method when several non-matrix methods are available.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
 
@@ -33,5 +33,8 @@ A numeric precursor-by-sample matrix, collected into R memory.
 }
 \description{
 Row names are internal precursor IDs. This function does not collapse
-modifications or charge states into peptide quantities.
+modifications or charge states into peptide quantities. TMT can have several
+scan or feature observations for one precursor and channel; \code{duplicates}
+controls their aggregation. Use \code{\link[=tbl_precursor_quant]{tbl_precursor_quant()}} to inspect each
+original observation and its retention time.
 }

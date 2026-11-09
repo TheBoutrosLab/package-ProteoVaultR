@@ -9,7 +9,7 @@ plot_protein_quantity_distribution(
   plot_type = c("boxplot", "violin"),
   source_id = NULL,
   samples = NULL,
-  method = "matrix",
+  method = NULL,
   transform = c("log2", "none")
 )
 }
@@ -33,7 +33,7 @@ continues to use the original sample names.}
 A ggplot object. Quantities use the selected transformation.
 }
 \description{
-Uses the DIA-NN protein-group matrix by default. Select a recorded report
-quantity with \code{method}. Nonpositive and missing quantities are excluded
+Uses the DIA-NN matrix or DDA ProteinQuantifier method by default. Select
+a recorded quantity with \code{method}. Nonpositive and missing quantities are excluded
 before taking log2.
 }

@@ -8,7 +8,7 @@ plot_protein_abundance(
   vault,
   protein,
   source_id = NULL,
-  method = "matrix",
+  method = NULL,
   samples = NULL,
   color_by = NULL,
   style = c("BPG", "ggplot2")
@@ -22,7 +22,8 @@ plot_protein_abundance(
 
 \item{source_id}{Optional source identifier from \code{vault_info(vault)$sources}.}
 
-\item{method}{Protein-group quantification method; defaults to \code{"matrix"}.}
+\item{method}{Protein-group quantification method; \code{NULL} selects the default
+available method.}
 
 \item{samples}{Optional original sample names to select and order.}
 
@@ -36,7 +37,7 @@ A BPG trellis plot or ggplot object, according to \code{style}.
 }
 \description{
 Selects an exact \code{source_group_id} from the protein quantity table. The
-default \code{matrix} method uses DIA-NN normalized protein-group quantities.
+default method uses \code{matrix} for DIA and \code{ProteinQuantifier} for DDA.
 Attached sample metadata supplies shorter x axis labels when \code{sample_id}
 is present. Missing quantities have no bar; zero quantities remain zero.
 }

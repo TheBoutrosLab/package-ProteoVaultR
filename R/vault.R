@@ -208,18 +208,29 @@ vault_schema <- function() {
         protein_identifiers = c("protein_id", "source_id", "source_accession", "mapping_type", "mapped_id"),
         protein_groups = c(
             "group_id", "source_id", "source_group_id", "method_id",
-            "group_type", "score", "score_type"
+            "group_type", "score", "score_type", "reported_n_proteins",
+            "reported_n_peptides"
         ),
         protein_groups_readable = c(
             "group_id", "source_id", "source_group_id", "method",
-            "group_type", "score", "score_type"
+            "group_type", "score", "score_type", "reported_n_proteins",
+            "reported_n_peptides"
         ),
         protein_group_members = c("group_id", "protein_id"),
         protein_quant = c("group_id", "channel_id", "source_id", "method_id", "quantity"),
         protein_quant_readable = c("group_id", "channel_id", "source_id", "method", "quantity"),
-        precursor_quant = c("precursor_id", "channel_id", "source_id", "method_id", "quantity"),
-        precursor_quant_readable = c("precursor_id", "channel_id", "source_id", "method", "quantity"),
+        peptide_quant_features = c("feature_id", "source_id", "source_row_number",
+            "peptide_id", "source_peptide", "source_protein", "reported_n_proteins",
+            "charge", "fraction"),
+        peptide_quant = c("feature_id", "channel_id", "source_id", "method_id", "quantity"),
+        peptide_quant_readable = c("feature_id", "channel_id", "source_id", "method", "quantity"),
+        precursor_quant = c("quant_id", "precursor_id", "channel_id", "source_id", "method_id", "quantity", "source_element_id", "source_map_id", "rt_seconds", "spectrum_id"),
+        precursor_quant_readable = c("quant_id", "precursor_id", "channel_id", "source_id", "method", "quantity", "rt_seconds"),
         quant_methods = c("method_id", "name"),
+        quant_channels = c("channel_id", "sample_id", "run_id", "label"),
+        tmt_plexes = c("plex_id", "plex_name", "reference_channel_id"),
+        tmt_channels = c("channel_id", "plex_id", "reporter_label", "channel_description"),
+        tmt_runs = c("run_id", "plex_id"),
         grouping_methods = c("method_id", "name"),
         processing_stages = c("stage_id", "name"),
         score_types = c("score_id", "name"),
@@ -230,14 +241,19 @@ vault_schema <- function() {
         ),
         precursor_quant_long = c(
             "sample_name", "precursor_id", "modified_sequence", "notation", "charge",
-            "method", "quantity", "q_value", "pep", "source_id"
+            "method", "quantity", "q_value", "pep", "source_id", "quant_id",
+            "source_element_id", "source_map_id", "rt_seconds", "spectrum_id"
         ),
+        peptide_quant_long = c("sample_name", "feature_id", "peptide", "source_peptide",
+            "source_protein", "reported_n_proteins", "charge", "fraction", "method",
+            "quantity", "source_id"),
         protein_group_summary = c("group_id", "method", "group_type", "member_count"),
         sample_protein_counts = c("sample_name", "quantified_protein_groups"),
         pin_features = c("source_id", "spectrum_reference", "scan_number", "feature_name", "value"),
         qc_metrics = c(
-            "source_id", "row_number", "dataset_id", "layer", "sample_name",
-            "metric_name", "group", "value", "status", "source_file"
+            "source_id", "row_number", "dataset_id", "acquisition_mode", "layer",
+            "sample_name", "inference_route", "metric_name", "group", "value",
+            "status", "source_file", "calculation_version"
         )
     )
 }
@@ -296,6 +312,7 @@ check_schema <- function(connection) {
 vault_info <- function(vault) {
     vault_connection(vault = vault)
     stage_layers <- c(
+        design = "core",
         quantitation = "core",
         validation = "core",
         inference = "core",

@@ -8,7 +8,7 @@ CREATE TABLE source_files (
     format VARCHAR NOT NULL, stage VARCHAR NOT NULL, size_bytes BIGINT NOT NULL,
     mtime_ns BIGINT NOT NULL, status VARCHAR NOT NULL, details VARCHAR
 );
-CREATE TABLE samples (sample_id BIGINT PRIMARY KEY, sample_name VARCHAR NOT NULL);
+CREATE TABLE samples (sample_id BIGINT PRIMARY KEY, sample_name VARCHAR NOT NULL UNIQUE);
 CREATE TABLE runs (
     run_id BIGINT PRIMARY KEY, sample_id BIGINT,
     run_name VARCHAR NOT NULL, file_name VARCHAR
@@ -68,7 +68,8 @@ CREATE TABLE psm_proteins (
 CREATE TABLE protein_groups (
     group_id BIGINT PRIMARY KEY, source_id BIGINT NOT NULL,
     source_group_id VARCHAR NOT NULL, method_id INTEGER NOT NULL, group_type VARCHAR NOT NULL,
-    score DOUBLE, score_type VARCHAR
+    score DOUBLE, score_type VARCHAR,
+    reported_n_proteins INTEGER, reported_n_peptides INTEGER
 );
 CREATE TABLE protein_group_members (
     group_id BIGINT NOT NULL, protein_id BIGINT NOT NULL,
@@ -78,16 +79,42 @@ CREATE TABLE quant_channels (
     channel_id BIGINT PRIMARY KEY, sample_id BIGINT NOT NULL,
     run_id BIGINT, label VARCHAR NOT NULL
 );
+CREATE TABLE tmt_plexes (
+    plex_id BIGINT PRIMARY KEY, plex_name VARCHAR NOT NULL UNIQUE,
+    reference_channel_id BIGINT
+);
+CREATE TABLE tmt_channels (
+    channel_id BIGINT PRIMARY KEY, plex_id BIGINT NOT NULL,
+    reporter_label VARCHAR NOT NULL, channel_description VARCHAR,
+    UNIQUE (plex_id, reporter_label)
+);
+CREATE TABLE tmt_runs (run_id BIGINT PRIMARY KEY, plex_id BIGINT NOT NULL);
 CREATE TABLE precursor_quant (
+    quant_id BIGINT PRIMARY KEY,
     precursor_id BIGINT NOT NULL, channel_id BIGINT NOT NULL,
     source_id BIGINT NOT NULL, method_id INTEGER NOT NULL,
     quantity DOUBLE, q_value DOUBLE, pep DOUBLE,
-    PRIMARY KEY(precursor_id, channel_id, source_id, method_id)
+    source_element_id VARCHAR, source_map_id INTEGER,
+    rt_seconds DOUBLE, rt_start_seconds DOUBLE, rt_stop_seconds DOUBLE,
+    spectrum_id BIGINT
 );
 CREATE TABLE protein_quant (
     group_id BIGINT NOT NULL, channel_id BIGINT NOT NULL,
     source_id BIGINT NOT NULL, method_id INTEGER NOT NULL,
     quantity DOUBLE, PRIMARY KEY(group_id, channel_id, source_id, method_id)
+);
+CREATE TABLE peptide_quant_features (
+    feature_id BIGINT PRIMARY KEY, source_id BIGINT NOT NULL,
+    source_row_number BIGINT NOT NULL, peptide_id BIGINT NOT NULL,
+    source_peptide VARCHAR NOT NULL, source_protein VARCHAR,
+    reported_n_proteins INTEGER,
+    charge INTEGER, fraction VARCHAR
+);
+CREATE TABLE peptide_quant (
+    feature_id BIGINT NOT NULL, channel_id BIGINT NOT NULL,
+    source_id BIGINT NOT NULL, method_id INTEGER NOT NULL,
+    quantity DOUBLE,
+    PRIMARY KEY(feature_id, channel_id, source_id, method_id)
 );
 CREATE TABLE precursor_groups (
     precursor_id BIGINT NOT NULL, group_id BIGINT NOT NULL,
@@ -103,10 +130,12 @@ CREATE TABLE qc_metrics (
     source_id BIGINT NOT NULL,
     row_number BIGINT NOT NULL,
     dataset_id VARCHAR NOT NULL,
+    acquisition_mode VARCHAR,
     layer VARCHAR NOT NULL,
     source_process VARCHAR,
     sample_name VARCHAR,
     search_engine VARCHAR,
+    inference_route VARCHAR,
     fraction_id VARCHAR,
     metric_name VARCHAR NOT NULL,
     "group" VARCHAR,
@@ -114,6 +143,7 @@ CREATE TABLE qc_metrics (
     unit VARCHAR,
     status VARCHAR NOT NULL,
     source_file VARCHAR,
+    calculation_version VARCHAR,
     PRIMARY KEY(source_id, row_number)
 );
 CREATE TABLE import_counts (
@@ -130,6 +160,7 @@ CREATE VIEW psm_scores_readable AS SELECT q.psm_id, t.name, q.value, q.higher_be
 CREATE VIEW psms_readable AS SELECT p.* EXCLUDE(stage_id), t.name AS stage FROM psms p JOIN processing_stages t USING(stage_id);
 CREATE VIEW protein_quant_readable AS SELECT q.* EXCLUDE(method_id), t.name AS method FROM protein_quant q JOIN quant_methods t USING(method_id);
 CREATE VIEW precursor_quant_readable AS SELECT q.* EXCLUDE(method_id), t.name AS method FROM precursor_quant q JOIN quant_methods t USING(method_id);
+CREATE VIEW peptide_quant_readable AS SELECT q.* EXCLUDE(method_id), t.name AS method FROM peptide_quant q JOIN quant_methods t USING(method_id);
 CREATE VIEW protein_quant_long AS
     SELECT s.sample_name, g.group_id, g.source_group_id, gm.name AS grouping_method,
         t.name AS quantification_method, q.quantity, q.source_id
@@ -137,10 +168,20 @@ CREATE VIEW protein_quant_long AS
     JOIN quant_channels c USING(channel_id) JOIN samples s USING(sample_id);
 CREATE VIEW precursor_quant_long AS
     SELECT s.sample_name, p.precursor_id, f.modified_sequence, f.notation, p.charge,
-        t.name AS method, q.quantity, q.q_value, q.pep, q.source_id
+        t.name AS method, q.quantity, q.q_value, q.pep, q.source_id,
+        q.quant_id, q.source_element_id, q.source_map_id,
+        q.rt_seconds, q.rt_start_seconds, q.rt_stop_seconds, q.spectrum_id
     FROM precursor_quant q JOIN quant_methods t USING(method_id) JOIN precursors p USING(precursor_id)
     JOIN peptidoforms f USING(peptidoform_id) JOIN quant_channels c USING(channel_id)
     JOIN samples s USING(sample_id);
+CREATE VIEW peptide_quant_long AS
+    SELECT s.sample_name, f.feature_id, p.sequence AS peptide, f.source_peptide,
+        f.source_protein,
+        f.reported_n_proteins, f.charge, f.fraction, t.name AS method,
+        q.quantity, q.source_id
+    FROM peptide_quant q JOIN peptide_quant_features f USING(feature_id)
+    JOIN peptides p USING(peptide_id) JOIN quant_methods t USING(method_id)
+    JOIN quant_channels c USING(channel_id) JOIN samples s USING(sample_id);
 CREATE VIEW protein_group_summary AS
     SELECT g.*, count(m.protein_id) AS member_count FROM protein_groups_readable g
     LEFT JOIN protein_group_members m USING(group_id) GROUP BY ALL;

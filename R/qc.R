@@ -117,8 +117,8 @@ plot_precursor_quantity_distribution <- function(
 
 #' Plot protein-group quantity distributions by sample
 #'
-#' Uses the DIA-NN protein-group matrix by default. Select a recorded report
-#' quantity with `method`. Nonpositive and missing quantities are excluded
+#' Uses the DIA-NN matrix or DDA ProteinQuantifier method by default. Select
+#' a recorded quantity with `method`. Nonpositive and missing quantities are excluded
 #' before taking log2.
 #'
 #' @param vault An open ProteoVault connection returned by [open_vault()].
@@ -137,11 +137,12 @@ plot_protein_quantity_distribution <- function(
     plot_type = c("boxplot", "violin"),
     source_id = NULL,
     samples = NULL,
-    method = "matrix",
+    method = NULL,
     transform = c("log2", "none")
 ) {
     plot_type <- match.arg(arg = plot_type)
     transform <- match.arg(transform)
+    method <- resolve_quant_method(vault, "protein_group", method)
     quantities <- tbl_protein_quant(
         vault = vault,
         source_id = source_id,

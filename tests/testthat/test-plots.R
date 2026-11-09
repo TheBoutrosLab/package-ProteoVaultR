@@ -34,10 +34,10 @@ test_that("QC plots read selected metrics from the vault", {
     )
     edit_test_vault(
         path = path,
-        statement = paste("INSERT INTO qc_metrics VALUES", paste(statements, collapse = ","))
+        statement = paste("INSERT INTO qc_metrics (source_id,row_number,dataset_id,layer,source_process,sample_name,search_engine,fraction_id,metric_name,\"group\",value,unit,status,source_file) VALUES", paste(statements, collapse = ","))
     )
     edit_test_vault(path, paste(
-        "INSERT INTO qc_metrics SELECT source_id, row_number+100, dataset_id,",
+        "INSERT INTO qc_metrics (source_id,row_number,dataset_id,layer,source_process,sample_name,search_engine,fraction_id,metric_name,\"group\",value,unit,status,source_file) SELECT source_id, row_number+100, dataset_id,",
         "layer, source_process, sample_name, search_engine, fraction_id,",
         "metric_name, 'target', value, unit, status, source_file",
         "FROM qc_metrics WHERE metric_name LIKE 'mass_error_%'"

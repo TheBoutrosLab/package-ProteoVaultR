@@ -16,12 +16,18 @@ plot_protein_precursor_quantity_lineplot(
 }
 \arguments{
 \item{vault}{An open ProteoVault.}
+
 \item{proteins}{Distinct protein identifiers, optionally named with plot labels.}
+
 \item{method}{Precursor quantification method, default \code{"Precursor.Normalised"}.}
+
 \item{source_id}{Optional precursor quantification source identifier.}
+
 \item{samples}{Optional original sample names, in plotting order.}
+
 \item{colours}{Optional colors for precursors. Supply one color per plotted
 precursor in legend order, or a named vector keyed by precursor label.}
+
 \item{style}{\code{"BPG"} (default) or \code{"ggplot2"}.}
 }
 \value{

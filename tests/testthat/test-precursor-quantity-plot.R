@@ -7,9 +7,9 @@ test_that("precursor quantity distributions use all measured precursors", {
     edit_test_vault(
         path = path,
         statement = paste(
-            "INSERT INTO precursor_quant VALUES",
-            "(51,112,103,2,8,NULL,NULL),",
-            "(52,111,103,2,12,NULL,NULL)"
+            "INSERT INTO precursor_quant (quant_id,precursor_id,channel_id,source_id,method_id,quantity,q_value,pep) VALUES",
+            "(6,51,112,103,2,8,NULL,NULL),",
+            "(7,52,111,103,2,12,NULL,NULL)"
         )
     )
     vault <- open_vault(path = path)
@@ -58,7 +58,7 @@ test_that("precursor distribution selects an exact report method", {
     path <- make_test_vault()
     edit_test_vault(path, "INSERT INTO quant_methods VALUES (3,'Precursor.Translated')")
     edit_test_vault(path,
-        "INSERT INTO precursor_quant VALUES (51,111,103,3,25,0.005,0.002)")
+        "INSERT INTO precursor_quant (quant_id,precursor_id,channel_id,source_id,method_id,quantity,q_value,pep) VALUES (6,51,111,103,3,25,0.005,0.002)")
     vault <- open_vault(path)
     on.exit(close_vault(vault), add = TRUE)
 
@@ -121,10 +121,10 @@ test_that("q-value cutoff filters precursor quantities from the report", {
     edit_test_vault(
         path = path,
         statement = paste(
-            "INSERT INTO precursor_quant VALUES",
-            "(51,111,103,3,6,0.005,NULL),",
-            "(51,112,103,3,9,0.02,NULL),",
-            "(52,111,103,3,14,0.5,NULL)"
+            "INSERT INTO precursor_quant (quant_id,precursor_id,channel_id,source_id,method_id,quantity,q_value,pep) VALUES",
+            "(6,51,111,103,3,6,0.005,NULL),",
+            "(7,51,112,103,3,9,0.02,NULL),",
+            "(8,52,111,103,3,14,0.5,NULL)"
         )
     )
     vault <- open_vault(path = path)

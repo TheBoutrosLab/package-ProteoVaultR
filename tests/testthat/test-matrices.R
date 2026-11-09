@@ -26,7 +26,7 @@ test_that("duplicate policies resolve each source group and sample", {
     edit_test_vault(
         path = path,
         statement = paste0(
-            "INSERT INTO protein_groups VALUES ",
+            "INSERT INTO protein_groups (group_id,source_id,source_group_id,method_id,group_type,score,score_type) VALUES ",
             "(95,101,'P1;P2',1,'quantification',NULL,NULL)"
         )
     )
@@ -56,7 +56,7 @@ test_that("duplicate policies resolve each source group and sample", {
 test_that("duplicate policy also applies to precursor matrices", {
     path <- make_test_vault()
     edit_test_vault(path, "INSERT INTO quant_channels VALUES (114,11,21,'LFQ')")
-    edit_test_vault(path, "INSERT INTO precursor_quant VALUES (51,114,102,1,12,NULL,NULL)")
+    edit_test_vault(path, "INSERT INTO precursor_quant (quant_id,precursor_id,channel_id,source_id,method_id,quantity,q_value,pep) VALUES (6,51,114,102,1,12,NULL,NULL)")
     vault <- open_vault(path)
     on.exit(close_vault(vault), add = TRUE)
     expect_message(

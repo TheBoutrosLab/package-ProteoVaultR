@@ -1,14 +1,15 @@
 #' Plot the abundance of one protein group across samples
 #'
 #' Selects an exact `source_group_id` from the protein quantity table. The
-#' default `matrix` method uses DIA-NN normalized protein-group quantities.
+#' default method uses `matrix` for DIA and `ProteinQuantifier` for DDA.
 #' Attached sample metadata supplies shorter x axis labels when `sample_id`
 #' is present. Missing quantities have no bar; zero quantities remain zero.
 #'
 #' @inheritParams tbl_protein_quant
 #' @param protein Exact `source_group_id` of the protein group to plot, such as
 #'   `"sp|O75083|WDR1_HUMAN"`.
-#' @param method Protein-group quantification method; defaults to `"matrix"`.
+#' @param method Protein-group quantification method; `NULL` selects the default
+#'   available method.
 #' @param samples Optional original sample names to select and order.
 #' @param color_by Optional column name in the attached sample metadata used
 #'   to color bars. Every selected sample must have a nonmissing value.
@@ -19,7 +20,7 @@ plot_protein_abundance <- function(
     vault,
     protein,
     source_id = NULL,
-    method = "matrix",
+    method = NULL,
     samples = NULL,
     color_by = NULL,
     style = c("BPG", "ggplot2")

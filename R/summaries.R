@@ -13,9 +13,10 @@ summarize_quantified_counts <- function(
     vault,
     level = "protein_group",
     source_id = NULL,
-    method = "matrix"
+    method = NULL
 ) {
-    level <- match.arg(arg = level, choices = c("protein_group", "precursor"))
+    level <- match.arg(arg = level, choices = c("protein_group", "precursor", "peptide"))
+    method <- resolve_quant_method(vault, level, method)
     source_id <- resolve_quant_source(
         vault = vault,
         level = level,
@@ -28,14 +29,17 @@ summarize_quantified_counts <- function(
             source_id = source_id,
             method = method
         )
-    } else {
+    } else if (level == "precursor") {
         tbl_precursor_quant(
             vault = vault,
             source_id = source_id,
             method = method
         )
+    } else {
+        tbl_peptide_quant(vault, source_id, method)
     }
-    feature <- if (level == "protein_group") "group_id" else "precursor_id"
+    feature <- switch(level, protein_group = "group_id", precursor = "precursor_id",
+        peptide = "feature_id")
     query %>%
         dplyr::group_by(.data$sample_name) %>%
         dplyr::summarise(
@@ -74,9 +78,10 @@ summarize_quantification_coverage <- function(
     vault,
     level = "protein_group",
     source_id = NULL,
-    method = "matrix"
+    method = NULL
 ) {
-    level <- match.arg(arg = level, choices = c("protein_group", "precursor"))
+    level <- match.arg(arg = level, choices = c("protein_group", "precursor", "peptide"))
+    method <- resolve_quant_method(vault, level, method)
     source_id <- resolve_quant_source(
         vault = vault,
         level = level,
@@ -85,10 +90,13 @@ summarize_quantification_coverage <- function(
     )
     query <- if (level == "protein_group") {
         tbl_protein_quant(vault = vault, source_id = source_id, method = method)
-    } else {
+    } else if (level == "precursor") {
         tbl_precursor_quant(vault = vault, source_id = source_id, method = method)
+    } else {
+        tbl_peptide_quant(vault, source_id, method)
     }
-    feature <- if (level == "protein_group") "group_id" else "precursor_id"
+    feature <- switch(level, protein_group = "group_id", precursor = "precursor_id",
+        peptide = "feature_id")
     total <- query %>%
         dplyr::summarise(total_samples = dplyr::n_distinct(.data$sample_name)) %>%
         dplyr::collect()

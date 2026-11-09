@@ -4,16 +4,16 @@
 \alias{tbl_protein_quant}
 \title{Query protein-group quantities}
 \usage{
-tbl_protein_quant(vault, source_id = NULL, method = "matrix")
+tbl_protein_quant(vault, source_id = NULL, method = NULL)
 }
 \arguments{
 \item{vault}{A handle returned by \code{\link[=open_vault]{open_vault()}}.}
 
 \item{source_id}{Optional source identifier from \code{vault_info(vault)$sources}.}
 
-\item{method}{Quantification method. \code{matrix} selects a saved matrix;
-precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normalised},
-and \code{Precursor.Translated}.}
+\item{method}{Quantification method. \code{NULL} selects \code{matrix} when present,
+otherwise the sole available method (such as \code{ProteinQuantifier}). Specify
+a method when several non-matrix methods are available.}
 }
 \value{
 A lazy dbplyr query. Missing values remain SQL NULL until collected.

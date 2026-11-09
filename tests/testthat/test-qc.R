@@ -13,7 +13,7 @@ test_that("cohort QC metrics are lazy and keep unavailable values", {
     edit_test_vault(
         path = path,
         statement = paste(
-            "INSERT INTO qc_metrics VALUES",
+            "INSERT INTO qc_metrics (source_id,row_number,dataset_id,layer,source_process,sample_name,search_engine,fraction_id,metric_name,\"group\",value,unit,status,source_file) VALUES",
             "(109,1,'TEST','acquisition','','S1','','','ms2_count','all','1200','count','available','S1.mzML'),",
             paste0(
                 "(109,2,'TEST','raw_identification','','S1','MSFragger',",

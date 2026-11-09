@@ -55,7 +55,7 @@ make_test_vault <- function(optional = FALSE, path = tempfile(fileext = ".duckdb
         "INSERT INTO psm_proteins VALUES (81,61),(81,62)",
         "INSERT INTO peptide_proteins VALUES (31,61),(31,62)",
         paste0(
-            "INSERT INTO protein_groups VALUES ",
+            "INSERT INTO protein_groups (group_id,source_id,source_group_id,method_id,group_type,score,score_type) VALUES ",
             "(91,101,'P1;P2',1,'quantification',NULL,NULL),",
             "(92,101,'P3',1,'quantification',NULL,NULL),",
             "(93,105,'group_0',2,'protein_group',0.9,'probability'),",
@@ -65,10 +65,10 @@ make_test_vault <- function(optional = FALSE, path = tempfile(fileext = ".duckdb
         "INSERT INTO quant_channels VALUES (111,11,21,'LFQ'),(112,12,22,'LFQ'),(113,13,23,'LFQ')",
         "INSERT INTO protein_quant VALUES (91,111,101,1,100),(91,112,101,1,NULL),(92,111,101,1,0),(92,112,101,1,200)",
         paste0(
-            "INSERT INTO precursor_quant VALUES ",
-            "(51,111,102,1,10,NULL,NULL),(51,112,102,1,NULL,NULL,NULL),",
-            "(52,111,102,1,0,NULL,NULL),(52,112,102,1,20,NULL,NULL),",
-            "(51,111,103,2,5,0.001,0.002)"
+            "INSERT INTO precursor_quant (quant_id,precursor_id,channel_id,source_id,method_id,quantity,q_value,pep) VALUES ",
+            "(1,51,111,102,1,10,NULL,NULL),(2,51,112,102,1,NULL,NULL,NULL),",
+            "(3,52,111,102,1,0,NULL,NULL),(4,52,112,102,1,20,NULL,NULL),",
+            "(5,51,111,103,2,5,0.001,0.002)"
         )
     )
     if (optional) {
