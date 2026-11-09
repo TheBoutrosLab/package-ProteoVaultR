@@ -18,9 +18,9 @@
 #'   UniProt mapping source when specified.
 #' @param mapping_source_id Optional UniProt mapping source identifier.
 #' @param duplicates Resolution of repeated feature/sample measurements:
-#'   `"error"` (default), `"best"`, `"sum"`, or `"mean"`. TMT precursor
-#'   observations often repeat, so choose an aggregation explicitly when
-#'   exporting `level = "precursor"`.
+#'   `"error"` (default outside TMT), `"best"`, `"sum"`, or `"mean"`.
+#'   TMT precursor exports default to `"sum"`; only `"sum"` and `"error"`
+#'   are supported for TMT to avoid mixing reporter channels independently.
 #' @param peptide_aggregation Required when deriving DIA peptides from
 #'   precursors: `"sum"`, `"max"`, or `"mean"`. Native DDA peptide rows do not
 #'   use this option.
@@ -39,6 +39,7 @@ as_summarized_experiment <- function(
     peptide_aggregation = NULL
 ) {
     level <- match.arg(level)
+    duplicates_missing <- missing(duplicates)
     duplicates <- match.arg(duplicates)
     if (!is.null(mapping_types) &&
         (!is.character(mapping_types) || anyNA(mapping_types) ||
@@ -63,6 +64,9 @@ as_summarized_experiment <- function(
     quant_level <- if (level == "protein_group") "protein_group" else if (
         native_peptide) "peptide" else "precursor"
     method <- resolve_quant_method(vault, quant_level, method)
+    if (duplicates_missing && quant_level == "precursor" && startsWith(method, "TMT.")) {
+        duplicates <- "sum"
+    }
     source_id <- resolve_quant_source(vault, quant_level, source_id, method)
     if (level == "protein_group") {
         assay <- matrix_protein_abundance(vault, source_id, method, samples,

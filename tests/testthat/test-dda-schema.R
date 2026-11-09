@@ -35,7 +35,9 @@ test_that("DDA peptide and TMT schema are queryable", {
         "(quant_id,precursor_id,channel_id,source_id,method_id,quantity,",
         "source_element_id,source_map_id,rt_seconds,spectrum_id) VALUES",
         "(6,51,114,113,4,10,'e_1',0,120,72),",
-        "(7,51,114,113,4,20,'e_2',0,180,72)"
+        "(7,51,114,113,4,20,'e_2',0,180,72),",
+        "(8,51,115,113,4,100,'e_1',1,120,72),",
+        "(9,51,115,113,4,1,'e_2',1,180,72)"
     ))
     edit_test_vault(path, "INSERT INTO protein_quant VALUES (95,114,110,3,100),(95,115,110,3,200)")
     edit_test_vault(path, paste(
@@ -53,10 +55,26 @@ test_that("DDA peptide and TMT schema are queryable", {
         method = "ProteinQuantifier"))$reported_n_peptides[[1]], 1)
     expect_equal(dplyr::collect(tbl_peptide_quant(vault))$source_peptide,
         rep("PEPTIDE(TMTpro)", 2))
-    precursor_rows <- dplyr::collect(tbl_precursor_quant(vault))
-    expect_equal(precursor_rows$quantity, c(10, 20))
-    expect_equal(precursor_rows$rt_seconds, c(120, 180))
-    expect_equal(precursor_rows$spectrum_id, bit64::as.integer64(c(72, 72)))
+    precursor_rows <- dplyr::collect(dplyr::arrange(tbl_precursor_quant(vault), quant_id))
+    expect_equal(precursor_rows$quantity, c(10, 20, 100, 1))
+    expect_equal(precursor_rows$rt_seconds, c(120, 180, 120, 180))
+    expect_equal(precursor_rows$spectrum_id, bit64::as.integer64(rep(72, 4)))
+    precursor_matrix <- matrix_precursor_abundance(vault)
+    expect_equal(unname(precursor_matrix["51", c("plex_01|126", "plex_01|127N")]),
+        c(30, 101))
+    expect_equal(matrix_precursor_abundance(vault, duplicates = "sum"),
+        precursor_matrix)
+    expect_error(matrix_precursor_abundance(vault, duplicates = "best"),
+        "TMT precursor duplicates")
+    expect_error(matrix_precursor_abundance(vault, duplicates = "mean"),
+        "TMT precursor duplicates")
+    expect_error(matrix_precursor_abundance(vault, duplicates = "error"),
+        "Duplicate feature/sample")
+    precursor_se <- as_summarized_experiment(vault, level = "precursor")
+    expect_equal(as.numeric(SummarizedExperiment::assay(precursor_se)["51", ]),
+        c(30, 101))
+    expect_error(as_summarized_experiment(vault, level = "precursor",
+        duplicates = "best"), "TMT precursor duplicates")
     expect_equal(matrix_peptide_abundance(vault)["1001", "plex_01|127N"], 20)
     expect_equal(summarize_quantified_counts(vault, level = "peptide")$quantified_count,
         c(1, 1))

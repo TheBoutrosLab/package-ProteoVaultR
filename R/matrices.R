@@ -121,12 +121,17 @@ matrix_protein_abundance <- function(
 #'
 #' Row names are internal precursor IDs. This function does not collapse
 #' modifications or charge states into peptide quantities. TMT can have several
-#' scan or feature observations for one precursor and channel; `duplicates`
-#' controls their aggregation. Use [tbl_precursor_quant()] to inspect each
-#' original observation and its retention time.
+#' scan or feature observations for one precursor and channel. TMT defaults to
+#' summing observations across every reporter channel. `"best"` and `"mean"`
+#' are rejected for TMT because they can combine channels from different
+#' observations or use different denominators. Use [tbl_precursor_quant()] to
+#' inspect each original observation and its retention time.
 #'
 #' @inheritParams tbl_precursor_quant
 #' @inheritParams matrix_quant
+#' @param duplicates For TMT, `"sum"` is the default and `"error"` is the
+#'   only other choice. For other methods, `"best"` is the default; `"sum"`,
+#'   `"mean"`, and `"error"` are also available.
 #' @return A numeric precursor-by-sample matrix, collected into R memory.
 #' @export
 matrix_precursor_abundance <- function(
@@ -136,6 +141,14 @@ matrix_precursor_abundance <- function(
     samples = NULL,
     duplicates = c("best", "error", "sum", "mean")
 ) {
+    method <- resolve_quant_method(vault, "precursor", method)
+    if (startsWith(method, "TMT.")) {
+        if (missing(duplicates)) duplicates <- "sum"
+        duplicates <- match.arg(duplicates)
+        if (!duplicates %in% c("sum", "error")) {
+            stop("TMT precursor duplicates must be 'sum' or 'error'", call. = FALSE)
+        }
+    }
     matrix_quant(
         query = tbl_precursor_quant(
             vault = vault,

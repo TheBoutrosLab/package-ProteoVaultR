@@ -23,10 +23,9 @@ a method when several non-matrix methods are available.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
 
-\item{duplicates}{How to resolve repeated feature/sample measurements:
-\code{"best"} (default) keeps the largest nonmissing quantity, \code{"sum"} sums
-nonmissing quantities, \code{"mean"} averages them, and \code{"error"} rejects
-duplicates. An all-missing pair remains NA for each numeric choice.}
+\item{duplicates}{For TMT, \code{"sum"} is the default and \code{"error"} is the
+only other choice. For other methods, \code{"best"} is the default; \code{"sum"},
+\code{"mean"}, and \code{"error"} are also available.}
 }
 \value{
 A numeric precursor-by-sample matrix, collected into R memory.
@@ -34,7 +33,9 @@ A numeric precursor-by-sample matrix, collected into R memory.
 \description{
 Row names are internal precursor IDs. This function does not collapse
 modifications or charge states into peptide quantities. TMT can have several
-scan or feature observations for one precursor and channel; \code{duplicates}
-controls their aggregation. Use \code{\link[=tbl_precursor_quant]{tbl_precursor_quant()}} to inspect each
-original observation and its retention time.
+scan or feature observations for one precursor and channel. TMT defaults to
+summing observations across every reporter channel. \code{"best"} and \code{"mean"}
+are rejected for TMT because they can combine channels from different
+observations or use different denominators. Use \code{\link[=tbl_precursor_quant]{tbl_precursor_quant()}} to
+inspect each original observation and its retention time.
 }

@@ -30,9 +30,9 @@ a method when several non-matrix methods are available.}
 \item{samples}{Optional character vector selecting and ordering sample names.}
 
 \item{duplicates}{Resolution of repeated feature/sample measurements:
-\code{"error"} (default), \code{"best"}, \code{"sum"}, or \code{"mean"}. TMT precursor
-observations often repeat, so choose an aggregation explicitly when
-exporting \code{level = "precursor"}.}
+\code{"error"} (default outside TMT), \code{"best"}, \code{"sum"}, or \code{"mean"}.
+TMT precursor exports default to \code{"sum"}; only \code{"sum"} and \code{"error"}
+are supported for TMT to avoid mixing reporter channels independently.}
 
 \item{mapping_types}{Optional UniProt mapping types to add as paired leading
 and member columns in rowData. \code{NULL} retains all available types. Requires an imported
