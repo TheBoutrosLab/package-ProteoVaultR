@@ -37,7 +37,7 @@ protein_table <- tbl_protein_quant(vault = vault) %>%
 protein_table
 ```
 
-The vault stores precursor quantities (modified peptide plus charge), not a native peptide quantity table. For an exploratory modified-peptide table, sum the positive precursor quantities across charge states. This aggregation is a choice made in R; it is not a DIA-NN peptide quantification result. Keep `modified_sequence` in the grouping so different modified forms remain separate.
+DIA vaults store precursor quantities (modified peptide plus charge). For an exploratory DIA modified-peptide table, sum positive precursor quantities across charge states. This aggregation is a choice made in R; keep `modified_sequence` in the grouping so different modified forms remain separate.
 
 ```{r}
 peptide_table <- tbl_precursor_quant(vault = vault) %>%
@@ -55,6 +55,17 @@ close_vault(vault)
 ```
 
 If multiple quantification sources are available, specify `source_id` in each accessor. For analyses that require an exact precursor definition, retain `precursor_id`, `modified_sequence`, and `charge` instead of aggregating.
+
+DDA ProteinQuantifier vaults also store native peptide quantities. Each `feature_id` retains one source peptide row, including its modified `source_peptide`, reported protein, charge, and fraction. A charge of zero denotes an aggregate row. The default method selects `matrix` for DIA or the sole available method, such as `ProteinQuantifier`, for DDA.
+
+```r
+tbl_peptide_quant(vault) %>% collect()
+matrix_peptide_abundance(vault)
+as_summarized_experiment(vault, level = "peptide")
+```
+
+For TMT, sample names use `<plex_id>|<reporter_label>`. The `tmt_plexes`, `tmt_channels`, and `tmt_runs` tables retain plex, channel, and mzML run relationships. TMT channel descriptions and associated run names are included in `colData` when exporting a `SummarizedExperiment`.
+`tbl_precursor_quant(vault)` exposes the identified reporter observations from the TMT ConsensusXML. Its `method` identifies scan-based or feature-based quantification. Use `quant_id` to preserve each observation: several scans or features can share a precursor and sample. `rt_seconds` is the scan or feature centroid RT; `spectrum_id` is populated for scan-based observations matched to filtered PSMs. DIA-NN report rows also include RT when the source report provides it.
 
 ## Query behavior
 
@@ -75,8 +86,8 @@ through `protein_group_members` when relating them to quantified groups, and
 retain all mappings unless your analysis defines a selection rule.
 
 - `tbl_qc_metrics()` returns the merged cohort QC metrics lazily, preserving sample and cohort rows, groups, status, and missing values. Its `value` column is text; convert selected numeric metrics when needed.
-- `tbl_protein_quant()`, `tbl_precursor_quant()`, `tbl_psms()`, `tbl_psm_scores()`, `tbl_protein_groups()`, `tbl_group_members()`, and `tbl_vault()` return lazy dbplyr queries.
-- `matrix_protein_abundance()` and `matrix_precursor_abundance()` materialize numeric matrices. Protein rows use source group labels by default; set `row_id = "group_id"` for internal IDs. Missing values remain NA, zeros remain zero, and repeated feature/sample measurements keep the largest nonmissing quantity by default. Use `duplicates = "error"`, `"sum"`, or `"mean"` to choose another policy.
+- `tbl_protein_quant()`, `tbl_precursor_quant()`, `tbl_peptide_quant()`, `tbl_psms()`, `tbl_psm_scores()`, `tbl_protein_groups()`, `tbl_group_members()`, and `tbl_vault()` return lazy dbplyr queries.
+- `matrix_protein_abundance()`, `matrix_precursor_abundance()`, and `matrix_peptide_abundance()` materialize numeric matrices. Protein rows use source group labels by default; set `row_id = "group_id"` for internal IDs. Missing values remain NA, zeros remain zero, and repeated feature/sample measurements keep the largest nonmissing quantity by default. Use `duplicates = "error"`, `"sum"`, or `"mean"` to choose another policy.
 - `summarize_quantified_counts()` aggregates distinct positive features in DuckDB and returns a small tibble. It counts each feature once per sample, including when several channels refer to that sample.
 - A quantification accessor selects one source and method. If several source files qualify, provide `source_id` from `vault_info(vault)$sources` explicitly.
 - Metadata access does not scan all fact tables. Exact BIGINT provenance values, such as nanosecond timestamps, retain their integer64 representation.

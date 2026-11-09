@@ -52,9 +52,9 @@ close_vault(vault)
 
 Choose one `source_id` when the requested method exists in multiple sources.
 `as_summarized_experiment()` preserves the chosen source and method in its
-metadata. A peptide-level assay is derived from precursor quantities and
-requires an explicit `peptide_aggregation`; it is not a separately measured
-peptide quantity.
+metadata. In DIA, a peptide-level assay is derived from precursor quantities
+and requires an explicit `peptide_aggregation`. DDA ProteinQuantifier peptide
+measurements are exported directly and retain their source feature IDs.
 
 ## Label-blind stable-reference normalization
 

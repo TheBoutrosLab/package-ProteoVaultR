@@ -99,7 +99,7 @@ aggregate_duplicate_quantities <- function(values, duplicates) {
 matrix_protein_abundance <- function(
     vault,
     source_id = NULL,
-    method = "matrix",
+    method = NULL,
     samples = NULL,
     row_id = c("source_group_id", "group_id"),
     duplicates = c("best", "error", "sum", "mean")
@@ -120,19 +120,35 @@ matrix_protein_abundance <- function(
 #' Create a charged-peptidoform abundance matrix
 #'
 #' Row names are internal precursor IDs. This function does not collapse
-#' modifications or charge states into peptide quantities.
+#' modifications or charge states into peptide quantities. TMT can have several
+#' scan or feature observations for one precursor and channel. TMT defaults to
+#' summing observations across every reporter channel. `"best"` and `"mean"`
+#' are rejected for TMT because they can combine channels from different
+#' observations or use different denominators. Use [tbl_precursor_quant()] to
+#' inspect each original observation and its retention time.
 #'
 #' @inheritParams tbl_precursor_quant
 #' @inheritParams matrix_quant
+#' @param duplicates For TMT, `"sum"` is the default and `"error"` is the
+#'   only other choice. For other methods, `"best"` is the default; `"sum"`,
+#'   `"mean"`, and `"error"` are also available.
 #' @return A numeric precursor-by-sample matrix, collected into R memory.
 #' @export
 matrix_precursor_abundance <- function(
     vault,
     source_id = NULL,
-    method = "matrix",
+    method = NULL,
     samples = NULL,
     duplicates = c("best", "error", "sum", "mean")
 ) {
+    method <- resolve_quant_method(vault, "precursor", method)
+    if (startsWith(method, "TMT.")) {
+        if (missing(duplicates)) duplicates <- "sum"
+        duplicates <- match.arg(duplicates)
+        if (!duplicates %in% c("sum", "error")) {
+            stop("TMT precursor duplicates must be 'sum' or 'error'", call. = FALSE)
+        }
+    }
     matrix_quant(
         query = tbl_precursor_quant(
             vault = vault,
@@ -140,6 +156,31 @@ matrix_precursor_abundance <- function(
             method = method
         ),
         feature = "precursor_id",
+        samples = samples,
+        duplicates = duplicates
+    )
+}
+
+
+#' Create a native peptide abundance matrix
+#'
+#' Rows use source feature IDs, retaining separate modified peptide, charge,
+#' protein, and fraction records. Use [tbl_peptide_quant()] to inspect them.
+#'
+#' @inheritParams tbl_peptide_quant
+#' @inheritParams matrix_quant
+#' @return A numeric peptide-feature-by-sample matrix.
+#' @export
+matrix_peptide_abundance <- function(
+    vault,
+    source_id = NULL,
+    method = NULL,
+    samples = NULL,
+    duplicates = c("best", "error", "sum", "mean")
+) {
+    matrix_quant(
+        query = tbl_peptide_quant(vault, source_id, method),
+        feature = "feature_id",
         samples = samples,
         duplicates = duplicates
     )

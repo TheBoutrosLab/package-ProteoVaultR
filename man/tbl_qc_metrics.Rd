@@ -14,7 +14,7 @@ A lazy dbplyr table with the published metric dimensions, value,
 status, and source file.
 }
 \description{
-Returns the final merged \code{qc-ProteomicDIA} metric table without reshaping or
+Returns the final merged DIA or DDA metric table without reshaping or
 recomputing values. Cohort rows have an empty \code{sample_name}; unavailable
 metrics retain their status and have missing values. The \code{value} column is
 text because some published metrics are categorical.

@@ -5,9 +5,11 @@ All notable changes to ProteoVaultR are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-04
+## [Unreleased] - 2026-11-09
 
 ### Added
+
+- Read native DDA peptide quantities and TMT precursor observations, including reporter channels, source feature IDs, retention times, and matched spectra.
 
 - Fit limma differential-abundance contrasts on exported assays with validated designs and annotated results.
 - Plot limma contrasts as BPG or ggplot volcano plots with transformed probability axes and selected protein annotations.

@@ -48,7 +48,8 @@ tbl_vault <- function(vault, name) {
         protein_groups = "protein_groups_readable",
         psm_scores = "psm_scores_readable",
         protein_quant = "protein_quant_readable",
-        precursor_quant = "precursor_quant_readable"
+        precursor_quant = "precursor_quant_readable",
+        peptide_quant = "peptide_quant_readable"
     )
     if (name %in% names(readable)) name <- readable[[name]]
     dbplyr::tbl_sql(
@@ -67,8 +68,10 @@ tbl_vault <- function(vault, name) {
 #'
 #' @inheritParams close_vault
 #' @param stage One or both of `validation` and `search`.
-#' @return A lazy dbplyr query containing PSM, spectrum, run, sample, peptide,
-#'   modification, and charge information. RT remains in seconds.
+#' @return A lazy dbplyr query containing PSM, spectrum, run, sample or TMT
+#'   plex, peptide, modification, and charge information. TMT acquisitions use
+#'   `plex_name` as `sample_name` because one run contains several reporters.
+#'   RT remains in seconds.
 #' @export
 tbl_psms <- function(vault, stage = "validation") {
     stage <- match.arg(
@@ -81,6 +84,9 @@ tbl_psms <- function(vault, stage = "validation") {
         dplyr::select(dplyr::all_of(c(
             "spectrum_id", "run_id", "native_id", "rt_seconds", "ms_level", "precursor_mz"
         )))
+    tmt_run_plex <- tbl_vault(vault, "tmt_runs") %>%
+        dplyr::inner_join(tbl_vault(vault, "tmt_plexes"), by = "plex_id") %>%
+        dplyr::select(dplyr::all_of(c("run_id", "plex_name")))
     tbl_vault(vault = vault, name = "psms") %>%
         dplyr::filter(.data$stage %in% .env$stage) %>%
         dplyr::inner_join(y = spectrum, by = "spectrum_id") %>%
@@ -88,10 +94,14 @@ tbl_psms <- function(vault, stage = "validation") {
             y = tbl_vault(vault = vault, name = "runs"),
             by = "run_id"
         ) %>%
-        dplyr::inner_join(
+        dplyr::left_join(
             y = tbl_vault(vault = vault, name = "samples"),
             by = "sample_id"
         ) %>%
+        dplyr::left_join(y = tmt_run_plex, by = "run_id") %>%
+        dplyr::mutate(sample_name = dplyr::coalesce(
+            .data$sample_name, .data$plex_name)) %>%
+        dplyr::select(-dplyr::all_of("plex_name")) %>%
         dplyr::inner_join(
             y = tbl_vault(vault = vault, name = "precursors"),
             by = "precursor_id"
@@ -226,7 +236,8 @@ tbl_protein_identifiers <- function(vault, source_id = NULL, mapping_type = NULL
 #' @inheritParams resolve_quant_source
 #' @return A lazy dbplyr query. Missing values remain SQL NULL until collected.
 #' @export
-tbl_protein_quant <- function(vault, source_id = NULL, method = "matrix") {
+tbl_protein_quant <- function(vault, source_id = NULL, method = NULL) {
+    method <- resolve_quant_method(vault, "protein_group", method)
     source_id <- resolve_quant_source(
         vault = vault,
         level = "protein_group",
@@ -242,14 +253,18 @@ tbl_protein_quant <- function(vault, source_id = NULL, method = "matrix") {
 
 #' Query precursor quantities
 #'
-#' Precursors are charged modified peptide forms. The current schema does not
-#' contain summarized peptide quantities; this function does not combine charge
-#' states or modifications. Report confidence is returned where supplied.
+#' Precursors are charged modified peptide forms. This function does not combine
+#' charge states, modifications, or repeated TMT observations. `quant_id` and
+#' source element/map IDs retain individual TMT scans or features. `rt_seconds`
+#' is the TMT centroid RT or DIA-NN report RT; matrix rows have no RT. A
+#' `spectrum_id` is present only for scan measurements matched to accepted PSMs.
+#' Report confidence is returned where supplied.
 #'
 #' @inheritParams resolve_quant_source
 #' @return A lazy dbplyr query with source notation and quantification method.
 #' @export
-tbl_precursor_quant <- function(vault, source_id = NULL, method = "matrix") {
+tbl_precursor_quant <- function(vault, source_id = NULL, method = NULL) {
+    method <- resolve_quant_method(vault, "precursor", method)
     source_id <- resolve_quant_source(
         vault = vault,
         level = "precursor",
@@ -261,9 +276,27 @@ tbl_precursor_quant <- function(vault, source_id = NULL, method = "matrix") {
 }
 
 
+#' Query native peptide quantities
+#'
+#' Returns one ProteinQuantifier source row per peptide feature and sample.
+#' `feature_id` preserves source rows, including their modification, charge,
+#' protein, and fraction annotations. A charge of zero means an aggregate row.
+#'
+#' @inheritParams resolve_quant_source
+#' @return A lazy dbplyr query with source peptide and sample context.
+#' @export
+tbl_peptide_quant <- function(vault, source_id = NULL, method = NULL) {
+    method <- resolve_quant_method(vault, "peptide", method)
+    source_id <- resolve_quant_source(vault, "peptide", source_id, method)
+    tbl_vault(vault, "peptide_quant_long") %>%
+        dplyr::filter(.data$source_id == .env$source_id,
+            .data$method == .env$method)
+}
+
+
 #' Query published cohort QC metrics
 #'
-#' Returns the final merged `qc-ProteomicDIA` metric table without reshaping or
+#' Returns the final merged DIA or DDA metric table without reshaping or
 #' recomputing values. Cohort rows have an empty `sample_name`; unavailable
 #' metrics retain their status and have missing values. The `value` column is
 #' text because some published metrics are categorical.

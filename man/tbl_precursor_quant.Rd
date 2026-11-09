@@ -4,22 +4,25 @@
 \alias{tbl_precursor_quant}
 \title{Query precursor quantities}
 \usage{
-tbl_precursor_quant(vault, source_id = NULL, method = "matrix")
+tbl_precursor_quant(vault, source_id = NULL, method = NULL)
 }
 \arguments{
 \item{vault}{A handle returned by \code{\link[=open_vault]{open_vault()}}.}
 
 \item{source_id}{Optional source identifier from \code{vault_info(vault)$sources}.}
 
-\item{method}{Quantification method. \code{matrix} selects a saved matrix;
-precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normalised},
-and \code{Precursor.Translated}.}
+\item{method}{Quantification method. \code{NULL} selects \code{matrix} when present,
+otherwise the sole available method (such as \code{ProteinQuantifier}). Specify
+a method when several non-matrix methods are available.}
 }
 \value{
 A lazy dbplyr query with source notation and quantification method.
 }
 \description{
-Precursors are charged modified peptide forms. The current schema does not
-contain summarized peptide quantities; this function does not combine charge
-states or modifications. Report confidence is returned where supplied.
+Precursors are charged modified peptide forms. This function does not combine
+charge states, modifications, or repeated TMT observations. \code{quant_id} and
+source element/map IDs retain individual TMT scans or features. \code{rt_seconds}
+is the TMT centroid RT or DIA-NN report RT; matrix rows have no RT. A
+\code{spectrum_id} is present only for scan measurements matched to accepted PSMs.
+Report confidence is returned where supplied.
 }

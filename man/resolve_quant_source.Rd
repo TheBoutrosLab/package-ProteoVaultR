@@ -4,25 +4,25 @@
 \alias{resolve_quant_source}
 \title{Resolve a quantification source}
 \usage{
-resolve_quant_source(vault, level, source_id = NULL, method = "matrix")
+resolve_quant_source(vault, level, source_id = NULL, method = NULL)
 }
 \arguments{
 \item{vault}{A handle returned by \code{\link[=open_vault]{open_vault()}}.}
 
-\item{level}{\code{protein_group} or \code{precursor}.}
+\item{level}{\code{protein_group}, \code{precursor}, or \code{peptide}.}
 
 \item{source_id}{Optional source identifier from \code{vault_info(vault)$sources}.}
 
-\item{method}{Quantification method. \code{matrix} selects a saved matrix;
-precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normalised},
-and \code{Precursor.Translated}.}
+\item{method}{Quantification method. \code{NULL} selects \code{matrix} when present,
+otherwise the sole available method (such as \code{ProteinQuantifier}). Specify
+a method when several non-matrix methods are available.}
 }
 \value{
 One source identifier.
 }
 \description{
 Resolves source IDs from saved measurement methods and the source inventory.
-Only the small source-ID result is collected. Known empty matrix/report
-formats remain selectable from provenance. Ambiguous
+Only the small source-ID result is collected. Known empty matrix/report and
+ProteinQuantifier formats remain selectable from provenance. Ambiguous
 sources must be selected explicitly, rather than combined or chosen by order.
 }

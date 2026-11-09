@@ -12,8 +12,10 @@ tbl_psms(vault, stage = "validation")
 \item{stage}{One or both of \code{validation} and \code{search}.}
 }
 \value{
-A lazy dbplyr query containing PSM, spectrum, run, sample, peptide,
-modification, and charge information. RT remains in seconds.
+A lazy dbplyr query containing PSM, spectrum, run, sample or TMT
+plex, peptide, modification, and charge information. TMT acquisitions use
+\code{plex_name} as \code{sample_name} because one run contains several reporters.
+RT remains in seconds.
 }
 \description{
 Selects validated PSM observations by default. Requesting \code{search} requires

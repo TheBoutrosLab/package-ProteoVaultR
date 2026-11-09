@@ -7,7 +7,7 @@
 matrix_protein_abundance(
   vault,
   source_id = NULL,
-  method = "matrix",
+  method = NULL,
   samples = NULL,
   row_id = c("source_group_id", "group_id"),
   duplicates = c("best", "error", "sum", "mean")
@@ -18,9 +18,9 @@ matrix_protein_abundance(
 
 \item{source_id}{Optional source identifier from \code{vault_info(vault)$sources}.}
 
-\item{method}{Quantification method. \code{matrix} selects a saved matrix;
-precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normalised},
-and \code{Precursor.Translated}.}
+\item{method}{Quantification method. \code{NULL} selects \code{matrix} when present,
+otherwise the sole available method (such as \code{ProteinQuantifier}). Specify
+a method when several non-matrix methods are available.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
 

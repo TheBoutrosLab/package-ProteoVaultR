@@ -7,7 +7,7 @@
 as_summarized_experiment(
   vault,
   level = c("protein_group", "precursor", "peptide"),
-  method = "matrix",
+  method = NULL,
   source_id = NULL,
   samples = NULL,
   duplicates = c("error", "best", "sum", "mean"),
@@ -21,16 +21,18 @@ as_summarized_experiment(
 
 \item{level}{\code{"protein_group"}, \code{"precursor"}, or \code{"peptide"}.}
 
-\item{method}{Quantification method. \code{matrix} selects a saved matrix;
-precursor reports also support \code{Precursor.Quantity}, \code{Precursor.Normalised},
-and \code{Precursor.Translated}.}
+\item{method}{Quantification method. \code{NULL} selects \code{matrix} when present,
+otherwise the sole available method (such as \code{ProteinQuantifier}). Specify
+a method when several non-matrix methods are available.}
 
 \item{source_id}{Optional source identifier from \code{vault_info(vault)$sources}.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
 
 \item{duplicates}{Resolution of repeated feature/sample measurements:
-\code{"error"} (default), \code{"best"}, \code{"sum"}, or \code{"mean"}.}
+\code{"error"} (default outside TMT), \code{"best"}, \code{"sum"}, or \code{"mean"}.
+TMT precursor exports default to \code{"sum"}; only \code{"sum"} and \code{"error"}
+are supported for TMT to avoid mixing reporter channels independently.}
 
 \item{mapping_types}{Optional UniProt mapping types to add as paired leading
 and member columns in rowData. \code{NULL} retains all available types. Requires an imported
@@ -38,21 +40,23 @@ UniProt mapping source when specified.}
 
 \item{mapping_source_id}{Optional UniProt mapping source identifier.}
 
-\item{peptide_aggregation}{Required for \code{level = "peptide"}: \code{"sum"},
-\code{"max"}, or \code{"mean"} across precursor quantities in each sample.}
+\item{peptide_aggregation}{Required when deriving DIA peptides from
+precursors: \code{"sum"}, \code{"max"}, or \code{"mean"}. Native DDA peptide rows do not
+use this option.}
 }
 \value{
 A \link[SummarizedExperiment:SummarizedExperiment]{SummarizedExperiment::SummarizedExperiment} with a \code{quantity}
 assay, feature annotations in rowData, and sample metadata in colData.
 }
 \description{
-Protein-group and precursor measurements are stored in the vault. Peptide
-quantities are derived by aggregating all measured precursors with the same
-stripped sequence. For DIA-NN groups, the first accession in
+Protein-group and precursor measurements are stored in the vault. DDA
+ProteinQuantifier peptide rows are exported directly; DIA peptide quantities
+are derived by aggregating precursors with the same stripped sequence.
+For DIA-NN groups, the first accession in
 \code{source_group_id} is treated as the leading protein. It is matched to a
 stored group member to provide \code{leading_protein_id} and
 \code{leading_protein_accession}. A feature linked to several groups retains
 their leaders as list columns; the singular fields are missing then.
-Each UniProt mapping type adds \code{leading_<type>} and \code{member_<type>} character
+Each UniProt mapping type adds \verb{leading_<type>} and \verb{member_<type>} character
 columns. Distinct values are joined with semicolons; missing values are \code{NA}.
 }
