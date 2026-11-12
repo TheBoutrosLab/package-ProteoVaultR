@@ -5,6 +5,8 @@ test_that("DDA peptide and TMT schema are queryable", {
     ))
     edit_test_vault(path, "DELETE FROM protein_quant")
     edit_test_vault(path, "DELETE FROM precursor_quant")
+    edit_test_vault(path, "DELETE FROM source_quant_methods")
+    edit_test_vault(path, "INSERT INTO metadata VALUES ('tmt_quantity_scale:113','intensity')")
     edit_test_vault(path, paste(
         "INSERT INTO source_files VALUES",
         "(110,'/sources/protein','protein','openms_protein_quant','quantitation',10,1,'imported',NULL),",
@@ -14,6 +16,10 @@ test_that("DDA peptide and TMT schema are queryable", {
     ))
     edit_test_vault(path, "INSERT INTO quant_methods VALUES (3,'ProteinQuantifier')")
     edit_test_vault(path, "INSERT INTO quant_methods VALUES (4,'TMT.ScanBased')")
+    edit_test_vault(path, paste(
+        "INSERT INTO source_quant_methods VALUES",
+        "(110,'protein_group',3),(111,'peptide',3),(113,'precursor',4)"
+    ))
     edit_test_vault(path, "INSERT INTO grouping_methods VALUES (3,'ProteinQuantifier')")
     edit_test_vault(path, paste(
         "INSERT INTO protein_groups ",
@@ -30,6 +36,7 @@ test_that("DDA peptide and TMT schema are queryable", {
     edit_test_vault(path, "INSERT INTO tmt_runs VALUES (24,201)")
     edit_test_vault(path, "INSERT INTO spectra VALUES (72,24,'scan=8',130,2,510,2,104)")
     edit_test_vault(path, "INSERT INTO psms VALUES (83,72,51,'MSFragger',1,'target',104,2,0,1)")
+    edit_test_vault(path, "INSERT INTO psm_scores VALUES (83,1,0.005,FALSE)")
     edit_test_vault(path, paste(
         "INSERT INTO precursor_quant ",
         "(quant_id,precursor_id,channel_id,source_id,method_id,quantity,",
@@ -42,7 +49,7 @@ test_that("DDA peptide and TMT schema are queryable", {
     edit_test_vault(path, "INSERT INTO protein_quant VALUES (95,114,110,3,100),(95,115,110,3,200)")
     edit_test_vault(path, paste(
         "INSERT INTO peptide_quant_features VALUES",
-        "(1001,111,1,31,'PEPTIDE(TMTpro)','P1/P2',2,0,'all')"
+        "(1001,111,1,31,'PEPTIDE(TMTpro)','P2/P1',2,0,'all')"
     ))
     edit_test_vault(path, "INSERT INTO peptide_quant VALUES (1001,114,111,3,10),(1001,115,111,3,20)")
     vault <- open_vault(path)
@@ -61,25 +68,34 @@ test_that("DDA peptide and TMT schema are queryable", {
     expect_equal(precursor_rows$spectrum_id, bit64::as.integer64(rep(72, 4)))
     precursor_matrix <- matrix_precursor_abundance(vault)
     expect_equal(unname(precursor_matrix["51", c("plex_01|126", "plex_01|127N")]),
+        c(10, 100))
+    expect_equal(unname(matrix_precursor_abundance(vault, duplicates = "sum")["51", ]),
         c(30, 101))
-    expect_equal(matrix_precursor_abundance(vault, duplicates = "sum"),
-        precursor_matrix)
     expect_error(matrix_precursor_abundance(vault, duplicates = "best"),
-        "TMT precursor duplicates")
+        "should be one of")
     expect_error(matrix_precursor_abundance(vault, duplicates = "mean"),
-        "TMT precursor duplicates")
+        "should be one of")
+    expect_error(matrix_precursor_abundance(vault, duplicates = "best_across_plexes"),
+        "requires TMT.FeatureBased")
     expect_error(matrix_precursor_abundance(vault, duplicates = "error"),
         "Duplicate feature/sample")
     precursor_se <- as_summarized_experiment(vault, level = "precursor")
     expect_equal(as.numeric(SummarizedExperiment::assay(precursor_se)["51", ]),
-        c(30, 101))
+        c(10, 100))
+    expect_equal(S4Vectors::metadata(precursor_se)$duplicates, "best_per_plex")
     expect_error(as_summarized_experiment(vault, level = "precursor",
-        duplicates = "best"), "TMT precursor duplicates")
+        duplicates = "error"), "Duplicate feature/sample")
+    expect_error(as_summarized_experiment(vault, level = "precursor",
+        duplicates = "best"), "should be one of")
     expect_equal(matrix_peptide_abundance(vault)["1001", "plex_01|127N"], 20)
     expect_equal(summarize_quantified_counts(vault, level = "peptide")$quantified_count,
         c(1, 1))
     tmt_psm <- dplyr::collect(dplyr::filter(tbl_psms(vault), native_id == "scan=8"))
-    expect_equal(tmt_psm$sample_name, "plex_01")
+    expect_true(is.na(tmt_psm$sample_name))
+    expect_equal(tmt_psm$plex_name, "plex_01")
+    tmt_scores <- dplyr::collect(dplyr::filter(tbl_psm_scores(vault), native_id == "scan=8"))
+    expect_true(is.na(tmt_scores$sample_name))
+    expect_equal(tmt_scores$plex_name, "plex_01")
 
     se <- as_summarized_experiment(vault, level = "peptide",
         samples = c("plex_01|126", "plex_01|127N"))
@@ -94,4 +110,109 @@ test_that("DDA peptide and TMT schema are queryable", {
     expect_equal(columns$run_names[[2]], "fraction_1")
     expect_s3_class(plot_protein_quantity_distribution(vault), "ggplot")
     expect_s3_class(plot_protein_abundance(vault, "P1/P2", style = "ggplot2"), "ggplot")
+
+    close_vault(vault)
+    edit_test_vault(path, "UPDATE peptide_quant_features SET source_protein='P3' WHERE feature_id=1001")
+    vault <- open_vault(path)
+    expect_warning(unmatched <- as_summarized_experiment(vault, level = "peptide"),
+        "1 of 1 native peptide feature")
+    expect_true(is.na(SummarizedExperiment::rowData(unmatched)$protein_group_id))
+
+    close_vault(vault)
+    edit_test_vault(path, "UPDATE peptide_quant_features SET source_protein='P2/P1' WHERE feature_id=1001")
+    edit_test_vault(path, paste(
+        "INSERT INTO source_files VALUES",
+        "(118,'/sources/other-protein','other-protein','openms_protein_quant',",
+        "'quantitation',10,1,'imported',NULL)"
+    ))
+    edit_test_vault(path, "INSERT INTO source_quant_methods VALUES (118,'protein_group',3)")
+    vault <- open_vault(path)
+    expect_error(as_summarized_experiment(vault, level = "peptide"),
+        "Select protein_source_id")
+    selected <- as_summarized_experiment(vault, level = "peptide",
+        protein_source_id = 110)
+    expect_equal(S4Vectors::metadata(selected)$protein_source_id, "110")
+    expect_equal(SummarizedExperiment::rowData(selected)$protein_group_id, "95")
+})
+
+test_that("linked TMT features select complete reporter vectors", {
+    path <- make_test_vault()
+    edit_test_vault(path, "DELETE FROM precursor_quant")
+    edit_test_vault(path, "DELETE FROM source_quant_methods WHERE level='precursor'")
+    edit_test_vault(path, "INSERT INTO metadata VALUES ('tmt_quantity_scale:113','quasi_intensity')")
+    edit_test_vault(path, paste(
+        "INSERT INTO source_files VALUES",
+        "(113,'/sources/linked','linked','tmt_consensus_feature',",
+        "'quantitation',10,1,'imported',NULL)"
+    ))
+    edit_test_vault(path, "INSERT INTO quant_methods VALUES (4,'TMT.FeatureBased')")
+    edit_test_vault(path, "INSERT INTO source_quant_methods VALUES (113,'precursor',4)")
+    edit_test_vault(path, paste(
+        "INSERT INTO samples VALUES",
+        "(14,'plex_01|126'),(15,'plex_01|127N'),",
+        "(16,'plex_02|126'),(17,'plex_02|127N')"
+    ))
+    edit_test_vault(path, paste(
+        "INSERT INTO quant_channels VALUES",
+        "(114,14,NULL,'TMT'),(115,15,NULL,'TMT'),",
+        "(116,16,NULL,'TMT'),(117,17,NULL,'TMT')"
+    ))
+    edit_test_vault(path, paste(
+        "INSERT INTO tmt_plexes VALUES",
+        "(201,'plex_01',114),(202,'plex_02',116)"
+    ))
+    edit_test_vault(path, paste(
+        "INSERT INTO tmt_channels VALUES",
+        "(114,201,'126','reference'),(115,201,'127N','treated'),",
+        "(116,202,'126','reference'),(117,202,'127N','treated')"
+    ))
+    edit_test_vault(path, paste(
+        "INSERT INTO precursor_quant",
+        "(quant_id,precursor_id,channel_id,source_id,method_id,quantity,",
+        "source_element_id,source_map_id,rt_seconds) VALUES",
+        "(6,51,114,113,4,10,'e_1',0,120),",
+        "(7,51,115,113,4,100,'e_1',1,120),",
+        "(8,51,116,113,4,1,'e_1',2,120),",
+        "(9,51,117,113,4,1,'e_1',3,120),",
+        "(10,51,114,113,4,20,'e_2',0,180),",
+        "(11,51,115,113,4,1,'e_2',1,180),",
+        "(12,51,116,113,4,50,'e_2',2,180),",
+        "(13,51,117,113,4,50,'e_2',3,180)"
+    ))
+    vault <- open_vault(path)
+    on.exit(close_vault(vault), add = TRUE)
+    selected <- matrix_precursor_abundance(vault)
+    expect_equal(unname(selected["51", ]), c(10, 100, 50, 50))
+    expect_equal(matrix_precursor_abundance(vault,
+        samples = "plex_01|126")["51", "plex_01|126"], 10)
+    across <- matrix_precursor_abundance(vault, duplicates = "best_across_plexes")
+    expect_equal(unname(across["51", ]), c(20, 1, 50, 50))
+    expect_equal(matrix_precursor_abundance(vault,
+        samples = "plex_01|126", duplicates = "best_across_plexes")["51", "plex_01|126"], 20)
+    expect_equal(unname(matrix_precursor_abundance(vault,
+        duplicates = "sum")["51", ]), c(30, 101, 51, 51))
+    se <- as_summarized_experiment(vault, level = "precursor",
+        duplicates = "best_across_plexes")
+    expect_equal(unname(SummarizedExperiment::assay(se)["51", ]), c(20, 1, 50, 50))
+    expect_equal(S4Vectors::metadata(se)$duplicates, "best_across_plexes")
+    expect_equal(S4Vectors::metadata(se)$tmt_quantity_scale, "quasi_intensity")
+
+    close_vault(vault)
+    edit_test_vault(path, paste(
+        "UPDATE metadata SET value='intensity'",
+        "WHERE key='tmt_quantity_scale:113'"
+    ))
+    vault <- open_vault(path)
+    expect_warning(matrix_precursor_abundance(vault),
+        "without quasi-intensity normalization")
+
+    close_vault(vault)
+    edit_test_vault(path, paste(
+        "UPDATE metadata SET value='log2_ratio'",
+        "WHERE key='tmt_quantity_scale:113'"
+    ))
+    vault <- open_vault(path)
+    expect_error(matrix_precursor_abundance(vault), "not log2 ratios")
+    expect_error(matrix_precursor_abundance(vault, duplicates = "sum"),
+        "not log2 ratios")
 })

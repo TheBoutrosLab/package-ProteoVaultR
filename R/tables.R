@@ -68,10 +68,11 @@ tbl_vault <- function(vault, name) {
 #'
 #' @inheritParams close_vault
 #' @param stage One or both of `validation` and `search`.
-#' @return A lazy dbplyr query containing PSM, spectrum, run, sample or TMT
-#'   plex, peptide, modification, and charge information. TMT acquisitions use
-#'   `plex_name` as `sample_name` because one run contains several reporters.
-#'   RT remains in seconds.
+#' @return A lazy dbplyr query containing PSM, spectrum, run, sample, TMT
+#'   plex, peptide, modification, and charge information. `sample_name` is
+#'   missing for TMT acquisitions, which contain several reporter samples;
+#'   their plex is given by `plex_name`. For non-TMT acquisitions, `plex_name`
+#'   is missing. RT remains in seconds.
 #' @export
 tbl_psms <- function(vault, stage = "validation") {
     stage <- match.arg(
@@ -99,9 +100,6 @@ tbl_psms <- function(vault, stage = "validation") {
             by = "sample_id"
         ) %>%
         dplyr::left_join(y = tmt_run_plex, by = "run_id") %>%
-        dplyr::mutate(sample_name = dplyr::coalesce(
-            .data$sample_name, .data$plex_name)) %>%
-        dplyr::select(-dplyr::all_of("plex_name")) %>%
         dplyr::inner_join(
             y = tbl_vault(vault = vault, name = "precursors"),
             by = "precursor_id"
@@ -127,7 +125,7 @@ tbl_psms <- function(vault, stage = "validation") {
 tbl_psm_scores <- function(vault, stage = "validation") {
     context <- tbl_psms(vault = vault, stage = stage) %>%
         dplyr::select(dplyr::all_of(c(
-            "psm_id", "sample_name", "stage", "source_id", "search_engine",
+            "psm_id", "sample_name", "plex_name", "stage", "source_id", "search_engine",
             "native_id", "sequence", "modified_sequence", "charge"
         )))
     tbl_vault(vault = vault, name = "psm_scores") %>%

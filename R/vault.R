@@ -234,6 +234,7 @@ vault_schema <- function() {
             "quantity", "rt_seconds"
         ),
         quant_methods = c("method_id", "name"),
+        source_quant_methods = c("source_id", "level", "method_id"),
         quant_channels = c("channel_id", "sample_id", "run_id", "label"),
         tmt_plexes = c("plex_id", "plex_name", "reference_channel_id"),
         tmt_channels = c("channel_id", "plex_id", "reporter_label", "channel_description"),

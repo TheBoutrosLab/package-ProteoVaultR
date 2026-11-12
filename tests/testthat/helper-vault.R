@@ -46,6 +46,11 @@ make_test_vault <- function(optional = FALSE, path = tempfile(fileext = ".duckdb
     }
     statements <- c(
         "INSERT INTO quant_methods VALUES (1,'matrix'),(2,'Precursor.Quantity')",
+        paste0(
+            "INSERT INTO source_quant_methods VALUES ",
+            "(101,'protein_group',1),(102,'precursor',1),",
+            "(103,'precursor',2)"
+        ),
         "INSERT INTO grouping_methods VALUES (1,'DIA-NN'),(2,'ProteinProphet')",
         "INSERT INTO processing_stages VALUES (1,'validation'),(2,'search')",
         "INSERT INTO score_types VALUES (1,'q-value'),(2,'Posterior Error Probability_score'),(3,'hyperscore')",

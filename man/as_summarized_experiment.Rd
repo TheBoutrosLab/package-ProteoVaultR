@@ -10,10 +10,11 @@ as_summarized_experiment(
   method = NULL,
   source_id = NULL,
   samples = NULL,
-  duplicates = c("error", "best", "sum", "mean"),
+  duplicates = NULL,
   mapping_types = NULL,
   mapping_source_id = NULL,
-  peptide_aggregation = NULL
+  peptide_aggregation = NULL,
+  protein_source_id = NULL
 )
 }
 \arguments{
@@ -29,16 +30,22 @@ a method when several non-matrix methods are available.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
 
-\item{duplicates}{Resolution of repeated feature/sample measurements:
-\code{"error"} (default outside TMT), \code{"best"}, \code{"sum"}, or \code{"mean"}.
-TMT precursor exports default to \code{"sum"}; only \code{"sum"} and \code{"error"}
-are supported for TMT to avoid mixing reporter channels independently.}
+\item{duplicates}{Resolution of repeated feature/sample measurements.
+\code{NULL} chooses \code{"best_per_plex"} for TMT precursor quantities and \code{"error"}
+for other exports. Other exports also accept \code{"best"}, \code{"sum"}, and \code{"mean"}.
+TMT precursor exports also accept \code{"sum"}, \code{"best_across_plexes"} for linked
+FeatureBased data, and \code{"error"}.
+See \code{\link[=matrix_precursor_abundance]{matrix_precursor_abundance()}} for the TMT selection rules.}
 
 \item{mapping_types}{Optional UniProt mapping types to add as paired leading
 and member columns in rowData. \code{NULL} retains all available types. Requires an imported
 UniProt mapping source when specified.}
 
 \item{mapping_source_id}{Optional UniProt mapping source identifier.}
+
+\item{protein_source_id}{Optional ProteinQuantifier protein source used to
+annotate native DDA peptide rows. Required when several such sources exist.
+It does not select the peptide quantity source; use \code{source_id} for that.}
 
 \item{peptide_aggregation}{Required when deriving DIA peptides from
 precursors: \code{"sum"}, \code{"max"}, or \code{"mean"}. Native DDA peptide rows do not
@@ -52,6 +59,9 @@ assay, feature annotations in rowData, and sample metadata in colData.
 Protein-group and precursor measurements are stored in the vault. DDA
 ProteinQuantifier peptide rows are exported directly; DIA peptide quantities
 are derived by aggregating precursors with the same stripped sequence.
+Native peptide protein labels match ProteinQuantifier groups by their set of
+slash-separated accessions, independent of order. Rows without a unique
+group match retain missing protein annotations and trigger a count warning.
 For DIA-NN groups, the first accession in
 \code{source_group_id} is treated as the leading protein. It is matched to a
 stored group member to provide \code{leading_protein_id} and

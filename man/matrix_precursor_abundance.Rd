@@ -23,9 +23,11 @@ a method when several non-matrix methods are available.}
 
 \item{samples}{Optional character vector selecting and ordering sample names.}
 
-\item{duplicates}{For TMT, \code{"sum"} is the default and \code{"error"} is the
-only other choice. For other methods, \code{"best"} is the default; \code{"sum"},
-\code{"mean"}, and \code{"error"} are also available.}
+\item{duplicates}{For TMT, \code{"best_per_plex"} (default) selects the highest
+total reporter intensity per precursor and plex, \code{"sum"} adds observations,
+\code{"best_across_plexes"} selects one linked feature by its total across
+plexes, and \code{"error"} rejects duplicates. For other methods, \code{"best"} is
+the default; \code{"sum"}, \code{"mean"}, and \code{"error"} are also available.}
 }
 \value{
 A numeric precursor-by-sample matrix, collected into R memory.
@@ -34,8 +36,11 @@ A numeric precursor-by-sample matrix, collected into R memory.
 Row names are internal precursor IDs. This function does not collapse
 modifications or charge states into peptide quantities. TMT can have several
 scan or feature observations for one precursor and channel. TMT defaults to
-summing observations across every reporter channel. \code{"best"} and \code{"mean"}
-are rejected for TMT because they can combine channels from different
-observations or use different denominators. Use \code{\link[=tbl_precursor_quant]{tbl_precursor_quant()}} to
-inspect each original observation and its retention time.
+selecting the observation with the largest sum of reporter intensities in
+each plex. All channels in a plex come from the same observation. The
+\code{"best_across_plexes"} choice selects one linked feature for all plexes and
+requires FeatureBased data; an unobserved plex remains NA. These choices
+require intensity-scale quantities, not log2 ratios. The vault must record
+the TMT quantity scale during import. Use
+\code{\link[=tbl_precursor_quant]{tbl_precursor_quant()}} to inspect the original observations.
 }

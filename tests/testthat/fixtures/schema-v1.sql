@@ -151,6 +151,12 @@ CREATE TABLE import_counts (
     row_count BIGINT NOT NULL, PRIMARY KEY(source_id, entity)
 );
 CREATE TABLE quant_methods (method_id INTEGER PRIMARY KEY, name VARCHAR NOT NULL);
+CREATE TABLE source_quant_methods (
+    source_id BIGINT NOT NULL,
+    level VARCHAR NOT NULL CHECK(level IN ('protein_group', 'precursor', 'peptide')),
+    method_id INTEGER NOT NULL,
+    PRIMARY KEY(source_id, level, method_id)
+);
 CREATE TABLE grouping_methods (method_id INTEGER PRIMARY KEY, name VARCHAR NOT NULL);
 CREATE TABLE processing_stages (stage_id INTEGER PRIMARY KEY, name VARCHAR NOT NULL);
 CREATE TABLE score_types (score_id INTEGER PRIMARY KEY, name VARCHAR NOT NULL);

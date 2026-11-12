@@ -22,6 +22,7 @@ test_that("protein-group export keeps group quantities and one-to-many annotatio
     result <- as_summarized_experiment(vault, samples = c("S2", "S1"),
         mapping_types = "Gene_Name")
     expect_s4_class(result, "SummarizedExperiment")
+    expect_equal(S4Vectors::metadata(result)$duplicates, "error")
     expect_equal(dim(result), c(2L, 2L))
     expect_equal(colnames(result), c("S2", "S1"))
     expect_equal(SummarizedExperiment::assay(result, "quantity")["91", "S1"], 100)

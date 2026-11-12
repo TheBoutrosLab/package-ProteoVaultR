@@ -21,8 +21,7 @@ a method when several non-matrix methods are available.}
 One source identifier.
 }
 \description{
-Resolves source IDs from saved measurement methods and the source inventory.
-Only the small source-ID result is collected. Known empty matrix/report and
-ProteinQuantifier formats remain selectable from provenance. Ambiguous
-sources must be selected explicitly, rather than combined or chosen by order.
+Resolves source IDs from the saved source-method inventory. Methods from
+empty quantification files remain selectable. Ambiguous sources must be
+selected explicitly, rather than combined or chosen by order.
 }
