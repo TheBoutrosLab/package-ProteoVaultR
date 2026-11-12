@@ -25,11 +25,28 @@ test_that("ambiguous sources require a selection even when one is empty", {
             "FROM source_files WHERE source_id=101"
         )
     )
+    edit_test_vault(path, "INSERT INTO source_quant_methods VALUES (108,'protein_group',1)")
     vault <- open_vault(path)
     on.exit(close_vault(vault), add = TRUE)
     expect_error(tbl_protein_quant(vault), "Candidates:.*101.*101|Candidates:.*108")
     expect_equal(nrow(dplyr::collect(tbl_protein_quant(vault, source_id = 108))), 0L)
     expect_equal(nrow(dplyr::collect(tbl_protein_quant(vault, source_id = 101))), 4L)
+})
+
+test_that("empty quantification sources retain their available method", {
+    path <- make_test_vault()
+    edit_test_vault(path, paste(
+        "INSERT INTO source_files VALUES",
+        "(111,'/sources/empty-peptide','empty-peptide','openms_peptide_quant',",
+        "'quantitation',10,1,'imported',NULL)"
+    ))
+    edit_test_vault(path, "INSERT INTO quant_methods VALUES (3,'ProteinQuantifier')")
+    edit_test_vault(path, "INSERT INTO source_quant_methods VALUES (111,'peptide',3)")
+    vault <- open_vault(path)
+    on.exit(close_vault(vault), add = TRUE)
+    expect_equal(resolve_quant_method(vault, "peptide"), "ProteinQuantifier")
+    expect_equal(as.numeric(resolve_quant_source(vault, "peptide")), 111)
+    expect_equal(nrow(dplyr::collect(tbl_peptide_quant(vault))), 0L)
 })
 
 test_that("per-sample counts distinguish positive, zero, and missing", {

@@ -5,7 +5,7 @@ All notable changes to ProteoVaultR are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-09
+## [Unreleased] - 2026-11-12
 
 ### Added
 
@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Resolve quantity methods from the source inventory, preserve TMT PSM plex names, and clarify protein sources and identifiers in peptide exports.
+- Select consistent TMT precursor observations across reporter channels, with explicit aggregation choices and quantity-scale checks.
 - Select exact protein-group or precursor quantification methods in quantity distribution plots.
 - Plot protein-group and precursor quantity distributions without log transformation when requested.
 - Draw visible black borders around bars in BPG and ggplot QC plots.

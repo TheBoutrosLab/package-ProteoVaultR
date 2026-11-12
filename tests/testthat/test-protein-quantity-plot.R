@@ -45,6 +45,7 @@ test_that("protein-group quantity distributions use the normalized matrix", {
 test_that("protein-group distribution selects a report quantification method", {
     path <- make_test_vault()
     edit_test_vault(path, "INSERT INTO quant_methods VALUES (3,'PG.MaxLFQ')")
+    edit_test_vault(path, "INSERT INTO source_quant_methods VALUES (103,'protein_group',3)")
     edit_test_vault(path, paste(
         "INSERT INTO protein_groups (group_id,source_id,source_group_id,method_id,group_type,score,score_type) VALUES",
         "(95,103,'P1;P2',1,'quantification',NULL,NULL)"

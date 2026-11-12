@@ -58,6 +58,7 @@ test_that("precursor quantity distributions use all measured precursors", {
 test_that("precursor distribution selects an exact report method", {
     path <- make_test_vault()
     edit_test_vault(path, "INSERT INTO quant_methods VALUES (3,'Precursor.Translated')")
+    edit_test_vault(path, "INSERT INTO source_quant_methods VALUES (103,'precursor',3)")
     edit_test_vault(path,
         paste0(
             "INSERT INTO precursor_quant ",
@@ -123,6 +124,7 @@ test_that("q-value cutoff filters precursor quantities from the report", {
         path = path,
         statement = "INSERT INTO quant_methods VALUES (3,'Precursor.Normalised')"
     )
+    edit_test_vault(path, "INSERT INTO source_quant_methods VALUES (103,'precursor',3)")
     edit_test_vault(
         path = path,
         statement = paste(

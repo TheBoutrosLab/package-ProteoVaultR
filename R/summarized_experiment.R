@@ -3,6 +3,9 @@
 #' Protein-group and precursor measurements are stored in the vault. DDA
 #' ProteinQuantifier peptide rows are exported directly; DIA peptide quantities
 #' are derived by aggregating precursors with the same stripped sequence.
+#' Native peptide protein labels match ProteinQuantifier groups by their set of
+#' slash-separated accessions, independent of order. Rows without a unique
+#' group match retain missing protein annotations and trigger a count warning.
 #' For DIA-NN groups, the first accession in
 #' `source_group_id` is treated as the leading protein. It is matched to a
 #' stored group member to provide `leading_protein_id` and
@@ -17,10 +20,15 @@
 #'   and member columns in rowData. `NULL` retains all available types. Requires an imported
 #'   UniProt mapping source when specified.
 #' @param mapping_source_id Optional UniProt mapping source identifier.
-#' @param duplicates Resolution of repeated feature/sample measurements:
-#'   `"error"` (default outside TMT), `"best"`, `"sum"`, or `"mean"`.
-#'   TMT precursor exports default to `"sum"`; only `"sum"` and `"error"`
-#'   are supported for TMT to avoid mixing reporter channels independently.
+#' @param protein_source_id Optional ProteinQuantifier protein source used to
+#'   annotate native DDA peptide rows. Required when several such sources exist.
+#'   It does not select the peptide quantity source; use `source_id` for that.
+#' @param duplicates Resolution of repeated feature/sample measurements.
+#'   `NULL` chooses `"best_per_plex"` for TMT precursor quantities and `"error"`
+#'   for other exports. Other exports also accept `"best"`, `"sum"`, and `"mean"`.
+#'   TMT precursor exports also accept `"sum"`, `"best_across_plexes"` for linked
+#'   FeatureBased data, and `"error"`.
+#'   See [matrix_precursor_abundance()] for the TMT selection rules.
 #' @param peptide_aggregation Required when deriving DIA peptides from
 #'   precursors: `"sum"`, `"max"`, or `"mean"`. Native DDA peptide rows do not
 #'   use this option.
@@ -33,14 +41,13 @@ as_summarized_experiment <- function(
     method = NULL,
     source_id = NULL,
     samples = NULL,
-    duplicates = c("error", "best", "sum", "mean"),
+    duplicates = NULL,
     mapping_types = NULL,
     mapping_source_id = NULL,
-    peptide_aggregation = NULL
+    peptide_aggregation = NULL,
+    protein_source_id = NULL
 ) {
     level <- match.arg(level)
-    duplicates_missing <- missing(duplicates)
-    duplicates <- match.arg(duplicates)
     if (!is.null(mapping_types) &&
         (!is.character(mapping_types) || anyNA(mapping_types) ||
             any(!nzchar(mapping_types)))) {
@@ -49,6 +56,9 @@ as_summarized_experiment <- function(
     native_peptide <- level == "peptide" &&
         (identical(method, "ProteinQuantifier") ||
             (is.null(method) && any(vault$sources$format == "openms_peptide_quant")))
+    if (!native_peptide && !is.null(protein_source_id)) {
+        stop("protein_source_id applies only to native DDA peptide quantities", call. = FALSE)
+    }
     if (level == "peptide" && !native_peptide) {
         if (is.null(peptide_aggregation)) {
             stop("peptide_aggregation is required for derived peptide quantities", call. = FALSE)
@@ -64,10 +74,26 @@ as_summarized_experiment <- function(
     quant_level <- if (level == "protein_group") "protein_group" else if (
         native_peptide) "peptide" else "precursor"
     method <- resolve_quant_method(vault, quant_level, method)
-    if (duplicates_missing && quant_level == "precursor" && startsWith(method, "TMT.")) {
-        duplicates <- "sum"
+    if (is.null(duplicates)) {
+        duplicates <- if (quant_level == "precursor" && startsWith(method, "TMT.")) {
+            "best_per_plex"
+        } else {
+            "error"
+        }
     }
+    duplicates <- match.arg(duplicates,
+        c("error", "best", "sum", "mean", "best_per_plex", "best_across_plexes"))
     source_id <- resolve_quant_source(vault, quant_level, source_id, method)
+    if (native_peptide) {
+        protein_source_id <- tryCatch(
+            resolve_quant_source(vault, "protein_group", protein_source_id,
+                method = "ProteinQuantifier"),
+            error = function(error) {
+                stop("Select protein_source_id for native peptide annotations: ",
+                    conditionMessage(error), call. = FALSE)
+            }
+        )
+    }
     if (level == "protein_group") {
         assay <- matrix_protein_abundance(vault, source_id, method, samples,
             row_id = "group_id", duplicates = duplicates)
@@ -77,7 +103,7 @@ as_summarized_experiment <- function(
         assay <- matrix_peptide_abundance(vault, source_id, method, samples,
             duplicates)
         features <- native_peptide_export_data(vault, rownames(assay),
-            mapping_types, mapping_source_id)
+            mapping_types, mapping_source_id, protein_source_id)
     } else {
         precursor_assay <- matrix_precursor_abundance(vault, source_id, method,
             samples, duplicates)
@@ -118,8 +144,14 @@ as_summarized_experiment <- function(
         assays = list(quantity = assay),
         rowData = S4Vectors::DataFrame(features),
         colData = S4Vectors::DataFrame(col_data),
-        metadata = list(level = level, method = method,
+        metadata = list(level = level, method = method, duplicates = duplicates,
             source_id = as.character(source_id),
+            protein_source_id = if (native_peptide) as.character(protein_source_id) else NULL,
+            tmt_quantity_scale = if (quant_level == "precursor" && startsWith(method, "TMT.")) {
+                tmt_quantity_scale(vault, source_id, method)
+            } else {
+                NULL
+            },
             peptide_aggregation = peptide_aggregation)
     )
 }
@@ -174,7 +206,8 @@ sample_export_data <- function(vault, samples) {
     selected
 }
 
-native_peptide_export_data <- function(vault, ids, mapping_types, mapping_source_id) {
+native_peptide_export_data <- function(vault, ids, mapping_types,
+    mapping_source_id, protein_source_id) {
     features <- tbl_vault(vault, "peptide_quant_features") %>%
         dplyr::inner_join(tbl_vault(vault, "peptides"), by = "peptide_id") %>%
         dplyr::collect()
@@ -182,12 +215,21 @@ native_peptide_export_data <- function(vault, ids, mapping_types, mapping_source
     features$peptide_id <- as.character(features$peptide_id)
     features <- features[match(ids, features$feature_id), , drop = FALSE]
     names(features)[names(features) == "sequence"] <- "peptide"
-    protein_source <- resolve_quant_source(vault, "protein_group",
-        method = "ProteinQuantifier")
     groups <- dplyr::collect(tbl_protein_groups(vault,
-        source_id = protein_source, method = "ProteinQuantifier"))
+        source_id = protein_source_id, method = "ProteinQuantifier"))
     groups$group_id <- as.character(groups$group_id)
-    group_index <- match(features$source_protein, groups$source_group_id)
+    group_keys <- vapply(groups$source_group_id, canonical_protein_group, character(1))
+    feature_keys <- vapply(features$source_protein, canonical_protein_group, character(1))
+    ambiguous <- unique(group_keys[duplicated(group_keys) & !is.na(group_keys)])
+    group_index <- match(feature_keys, group_keys)
+    group_index[feature_keys %in% ambiguous] <- NA_integer_
+    unmatched <- sum(is.na(group_index))
+    if (unmatched) {
+        warning(sprintf(
+            "%d of %d native peptide feature(s) have no unique protein group match in source %s",
+            unmatched, nrow(features), as.character(protein_source_id)
+        ), call. = FALSE)
+    }
     features$protein_group_id <- groups$group_id[group_index]
     for (column in c("member_protein_ids", "member_accessions", "member_names")) {
         features[[column]] <- I(rep(list(character()), nrow(features)))
@@ -196,7 +238,7 @@ native_peptide_export_data <- function(vault, ids, mapping_types, mapping_source
     features$leading_protein_accession <- rep(NA_character_, nrow(features))
     matched_ids <- unique(stats::na.omit(features$protein_group_id))
     if (length(matched_ids)) {
-        annotations <- protein_group_export_data(vault, protein_source,
+        annotations <- protein_group_export_data(vault, protein_source_id,
             matched_ids, mapping_types, mapping_source_id)
         index <- match(features$protein_group_id, annotations$group_id)
         for (column in c("member_protein_ids", "member_accessions", "member_names")) {
@@ -213,6 +255,13 @@ native_peptide_export_data <- function(vault, ids, mapping_types, mapping_source
             mapping_source_id)
     }
     features
+}
+
+canonical_protein_group <- function(value) {
+    if (is.na(value) || !nzchar(trimws(value))) return(NA_character_)
+    accessions <- trimws(strsplit(value, "/", fixed = TRUE)[[1L]])
+    if (any(!nzchar(accessions))) return(NA_character_)
+    paste(sort(unique(accessions)), collapse = ";")
 }
 
 precursor_export_data <- function(vault, ids) {
