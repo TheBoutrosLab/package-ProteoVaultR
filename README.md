@@ -68,4 +68,7 @@ See the vignettes for [getting started](vignettes/getting-started.Rmd), [queryin
 
 ## License
 
-GNU GPL version 2 or later. Copyright 2026 Boutros Lab, Sanford Burnham Prebys Medical Discovery Institute.
+ProteoVaultR is licensed under the BSD 3-Clause License (`BSD-3-Clause`).
+See [LICENSE](LICENSE) for the terms. Third-party components retain their respective licenses.
+
+Copyright (C) 2026 Sanford Burnham Prebys Medical Discovery Institute ("Boutros Lab")

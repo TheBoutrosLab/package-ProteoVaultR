@@ -8,7 +8,7 @@ Description: Read proteomics results saved by ProteoVault as DuckDB databases.
     Provides read-only connections, lazy queries for quantification and
     identification results, protein-group membership, quantitative matrices,
     and per-sample summaries while preserving source and method provenance.
-License: GPL (>= 2)
+License: BSD_3_clause + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.2.0)
 Imports:
