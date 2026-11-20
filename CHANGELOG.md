@@ -5,7 +5,7 @@ All notable changes to ProteoVaultR are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-12
+## [Unreleased] - 2026-11-20
 
 ### Added
 
@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plot a selected protein group's abundance across samples with `plot_protein_abundance()`, optionally coloring bars by attached sample metadata.
 
 ### Changed
+
+- Migrate the package license from GPL to BSD 3-Clause and update license documentation and package metadata.
 
 - Resolve quantity methods from the source inventory, preserve TMT PSM plex names, and clarify protein sources and identifiers in peptide exports.
 - Select consistent TMT precursor observations across reporter channels, with explicit aggregation choices and quantity-scale checks.
