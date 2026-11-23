@@ -85,7 +85,9 @@ directory is excluded from both Git and package archives.
 manual dispatch. It uses the maintained r-lib setup actions and caches R
 dependencies separately from the DIA demo database. Analysis code executes on
 every build. Pull requests build without publishing or saving demo-data caches;
-builds from `main` publish only `docs/site/` to the `gh-pages` branch.
+every successful build uploads `docs/site/` as a Pages artifact. A separate
+job publishes that artifact only from `main`, using GitHub's official Pages
+actions. The build job has read-only repository permissions.
 
 `.github/demo-data.json` records the inputs required by executable articles,
 with their public URLs, sizes, and SHA-256 checksums.
@@ -103,9 +105,10 @@ A cache hit never bypasses checksum verification. GitHub caches are immutable;
 if a cache entry is repeatedly invalid, delete that entry in Actions caches and
 rerun so a verified copy can be saved under the same key.
 
-GitHub Pages is not yet enabled for this repository. After the workflow is merged
-and has created `gh-pages`, configure Pages to publish that branch from `/` and
-confirm the intended site visibility. Then set the actual site URL in
+GitHub Pages is not yet enabled for this repository. Before merging, configure
+Settings → Pages → Build and deployment → Source to use **GitHub Actions**
+and confirm the intended site visibility. This setting is needed for publishing;
+pull-request builds do not require it. Then set the actual site URL in
 `_pkgdown.yml` and `DESCRIPTION`. Verify both a cold build and a cache-hit build
 on GitHub before treating deployment as validated.
 

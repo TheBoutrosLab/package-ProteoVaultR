@@ -20,9 +20,6 @@ jobs:
       group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
       cancel-in-progress: false
 
-    permissions:
-      contents: write
-
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PROTEOVAULTR_DEMO_DIR: ${{ github.workspace }}/vignettes/demo-data
@@ -81,10 +78,28 @@ jobs:
           assert not (site / "_build").exists(), "Local plans must not be published"
           PYTHON
 
-      - name: Publish to gh-pages
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          branch: gh-pages
-          folder: docs/site
-          clean: true
+          path: docs/site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: pkgdown
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pkgdown-pages-deploy
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Publish site
+        id: deployment
+        uses: actions/deploy-pages@v4
