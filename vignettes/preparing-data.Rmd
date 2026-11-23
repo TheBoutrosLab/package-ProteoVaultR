@@ -1,0 +1,208 @@
+---
+title: "Preparing data"
+---
+
+Before comparing conditions, bring your measurements and experimental design
+together. This guide uses the HepG2 DIA demo to attach sample labels, choose
+protein-group quantities, and create a `SummarizedExperiment` for the next steps.
+All examples run on the demo database when this page is built.
+
+## 1. Open the demo database
+
+Run these examples in a fresh R session, or reopen the database if you closed it
+at the end of [Exploring a database](exploring-a-database.html).
+
+```{r setup, include=FALSE}
+library(ProteoVaultR)
+library(dplyr)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r open-vault}
+data_dir <- Sys.getenv("PROTEOVAULTR_DEMO_DIR", unset = "demo-data")
+vault <- open_vault(
+    path = file.path(data_dir, "hepg2_ifna-dia.proteovault.duckdb")
+)
+vault
+```
+
+## 2. Add sample metadata
+
+The HepG2 DIA example contains three control samples and three samples treated
+with interferon α-2a for 12 hours. Start by checking the names stored in the vault:
+
+```{r sample-names}
+tbl_vault(vault, "samples") %>%
+    select(sample_name) %>%
+    arrange(sample_name) %>%
+    collect() %>%
+    knitr::kable(col.names = "Sample name")
+```
+
+Create one metadata row per sample. Here, `sample_name` matches the database,
+`sample_id` supplies a shorter label, and `condition` records the comparison.
+The replicate numbers describe independent biological replicates; matching
+numbers across conditions do not establish a paired design.
+
+```{r sample-metadata}
+sample_info <- tibble::tribble(
+    ~sample_name,   ~sample_id, ~condition, ~biological_replicate,
+    "Control_R1",  "Ctrl1",    "Control",  1L,
+    "Control_R2",  "Ctrl2",    "Control",  2L,
+    "Control_R3",  "Ctrl3",    "Control",  3L,
+    "IFNa_12h_R1", "IFNa1",    "IFNa",     1L,
+    "IFNa_12h_R2", "IFNa2",    "IFNa",     2L,
+    "IFNa_12h_R3", "IFNa3",    "IFNa",     3L
+) %>%
+    mutate(condition = factor(condition, levels = c("Control", "IFNa")))
+
+vault <- set_sample_metadata(vault, sample_info)
+
+sample_metadata(vault) %>%
+    knitr::kable(
+        col.names = c("Sample name", "Label", "Condition", "Biological replicate")
+    )
+```
+
+::: {.alert .alert-warning role="note"}
+**Match names exactly:** Keep `sample_name` unchanged and unique. Use `sample_id`
+for shorter display labels. Assign the result of `set_sample_metadata()` back to
+`vault` so later steps use the attached metadata.
+:::
+
+Metadata are attached to this R handle. They do not modify the database, so save
+your sample table or analysis script if you want to reuse the assignments later.
+
+## 3. Choose the quantities
+
+Use the protein-group matrix from the HepG2 DIA results, as in the exploration
+guide. Resolve its source before exporting:
+
+```{r select-source}
+method <- "matrix"
+source_id <- resolve_quant_source(
+    vault,
+    level = "protein_group",
+    method = method
+)
+source_id
+```
+
+`matrix` selects the quantities imported from the DIA-NN protein-group matrix.
+For a different measurement or database, inspect its source and method inventory
+first. Choosing a source makes the selection explicit and keeps measurements
+from different files separate.
+
+## 4. Create a SummarizedExperiment
+
+A `SummarizedExperiment` keeps three connected pieces together: the quantity
+matrix, sample metadata, and feature annotations. Rows represent protein groups
+and columns represent samples. This makes it easier to carry the experimental
+design along as you explore and analyze the measurements.
+
+```{r create-experiment}
+se <- as_summarized_experiment(
+    vault,
+    level = "protein_group",
+    source_id = source_id,
+    method = method,
+    samples = sample_info$sample_name
+)
+se
+```
+
+The `samples` argument selects and orders columns using the original sample names.
+The `sample_id` labels remain available in the sample metadata. Internal database
+sample IDs are retained separately as `vault_sample_id`.
+
+The printed summary shows the matrix dimensions and available annotation columns.
+The object contains one assay at this stage:
+
+```{r assay-names}
+SummarizedExperiment::assayNames(se)
+```
+
+::: {.alert .alert-info role="note"}
+**Keep the starting quantities:** Exporting does not add normalization, log
+transformation, imputation, or another FDR filter. It preserves the quantities
+from your selected source, including any processing already applied upstream.
+:::
+
+### 4.1. Check sample order and metadata
+
+Read the sample annotations from `colData`:
+
+```{r inspect-sample-data}
+SummarizedExperiment::colData(se) %>%
+    as.data.frame() %>%
+    select(sample_name, sample_id, condition, biological_replicate) %>%
+    knitr::kable(
+        col.names = c("Sample name", "Label", "Condition", "Biological replicate"),
+        row.names = FALSE
+    )
+```
+
+Confirm that the assay columns follow the order you requested:
+
+```{r check-sample-order}
+identical(colnames(se), sample_info$sample_name)
+```
+
+### 4.2. Inspect quantities and feature annotations
+
+Preview the first five protein groups across the six samples:
+
+```{r preview-assay}
+quantity <- SummarizedExperiment::assay(se, "quantity")
+quantity[seq_len(5), , drop = FALSE] %>%
+    knitr::kable(digits = 2)
+```
+
+The matrix row names are internal protein-group IDs. Use `rowData` to find the
+original group labels and supporting annotations:
+
+```{r inspect-features}
+SummarizedExperiment::rowData(se) %>%
+    as.data.frame() %>%
+    select(group_id, source_group_id, leading_protein_accession) %>%
+    head(5) %>%
+    knitr::kable(
+        col.names = c("Group ID", "Original group", "Leading protein"),
+        row.names = FALSE
+    )
+```
+
+A row represents a protein group, which can contain several proteins. The leading
+accession provides a label; it does not turn a shared group quantity into an
+independent measurement for each member.
+
+### 4.3. Check missing values
+
+Missing quantities remain `NA`, while explicit zeros remain zero. Count them
+separately before deciding how to handle them:
+
+```{r inspect-missingness}
+tibble::tibble(
+    sample_name = colnames(quantity),
+    missing = colSums(is.na(quantity)),
+    zero = colSums(quantity == 0, na.rm = TRUE)
+) %>%
+    knitr::kable(col.names = c("Sample", "Missing quantities", "Zero quantities"))
+```
+
+This is a first check of the selected matrix. Review sample quality and the
+pattern of missing values before choosing normalization or imputation.
+
+## 5. Keep the prepared data
+
+The quantities and annotations in `se` are now in R memory, so you can close the
+vault and continue working with the prepared object:
+
+```{r close-vault}
+close_vault(vault)
+vault
+```
+
+Keep `se` for the next step: [Quality control](qc.html). It contains the sample conditions,
+selected quantities, and protein-group annotations needed to begin inspecting
+your samples.

@@ -42,6 +42,9 @@ test_that("volcano plots label transformed probabilities in both styles", {
     expect_equal(ggplot$data$label, c("O75083", "GENE2", ""))
     expect_equal(ggplot$layers[[2L]]$data$feature_id, c("g1", "g2"))
     expect_equal(ggplot$layers[[3L]]$aes_params$size, 1.8)
+    expect_null(ggplot$layers[[3L]]$aes_params$colour)
+    expect_equal(ggplot2::ggplot_build(ggplot)$data[[3L]]$colour,
+        c("#B24A59", "#777777"))
     labeled <- plot_limma_volcano(fit, style = "ggplot2",
         proteins = c("O75083", "P2"), label_by = "leading_gene_name")
     labeled_bpg <- plot_limma_volcano(fit,
@@ -96,6 +99,11 @@ test_that("p-value axis can color by q-value cutoff in both styles", {
     expect_equal(plot$data$negative_log10[[2L]], -log10(0.05))
     expect_equal(as.character(plot$data$significant),
         c("≤ 0.04; FC ≥ 0", "> 0.04", "≤ 0.04; FC ≥ 0"))
+    labeled <- plot_limma_volcano(fit, significance = "p_value",
+        color_by = "q_value", cutoff = 0.04, style = "ggplot2",
+        proteins = c("O75083", "P2"))
+    expect_equal(ggplot2::ggplot_build(labeled)$data[[3L]]$colour,
+        c("#B24A59", "#777777"))
     expect_equal(bpg$legend$right$args$key$title,
         as.expression(bquote(bold("q-value"))))
     expect_error(plot_limma_volcano(fit, significance = "q_value",

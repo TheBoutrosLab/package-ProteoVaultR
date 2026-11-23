@@ -1,3 +1,62 @@
+#' Style ggplot2 figures like Boutros Lab plots
+#'
+#' A white background without grid lines, a black panel border and ticks, and
+#' bold black axis and legend text. The defaults follow the BPG-style plots in
+#' ProteoVaultR: 12-point titles and 11-point axis and legend labels.
+#'
+#' @param base_size Base font size in points. Axis and legend labels use
+#'   `11 / 12` of this size; titles use the base size.
+#' @param base_family Font family used throughout the plot.
+#' @return A complete ggplot2 theme that can be added to a plot.
+#' @examples
+#' ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) +
+#'     ggplot2::geom_point() +
+#'     theme_boutroslab()
+#' @export
+theme_boutroslab <- function(base_size = 12, base_family = "sans") {
+    ggplot2::theme_bw(base_size = base_size, base_family = base_family) +
+        ggplot2::theme(
+            text = ggplot2::element_text(colour = "black"),
+            line = ggplot2::element_line(colour = "black"),
+            panel.grid = ggplot2::element_blank(),
+            panel.grid.major = ggplot2::element_blank(),
+            panel.grid.minor = ggplot2::element_blank(),
+            panel.border = ggplot2::element_rect(
+                colour = "black", fill = NA, linewidth = 0.5
+            ),
+            axis.line = ggplot2::element_blank(),
+            axis.ticks = ggplot2::element_line(colour = "black", linewidth = 0.5),
+            axis.title = ggplot2::element_text(
+                colour = "black", face = "bold", size = base_size
+            ),
+            axis.text = ggplot2::element_text(
+                colour = "black", face = "bold", size = base_size * 11 / 12
+            ),
+            legend.title = ggplot2::element_text(
+                colour = "black", face = "bold", size = base_size
+            ),
+            legend.text = ggplot2::element_text(
+                colour = "black", face = "bold", size = base_size * 11 / 12
+            ),
+            legend.key = ggplot2::element_rect(fill = "white", colour = NA),
+            plot.title = ggplot2::element_text(
+                colour = "black", face = "bold", size = base_size, hjust = 0.5
+            ),
+            plot.subtitle = ggplot2::element_text(
+                colour = "black", size = base_size * 11 / 12
+            ),
+            plot.caption = ggplot2::element_text(
+                colour = "black", size = base_size * 11 / 12
+            ),
+            strip.background = ggplot2::element_rect(
+                fill = "white", colour = "black", linewidth = 0.5
+            ),
+            strip.text = ggplot2::element_text(
+                colour = "black", face = "bold", size = base_size
+            )
+        )
+}
+
 #' Plot the abundance of one protein group across samples
 #'
 #' Selects an exact `source_group_id` from the protein quantity table. The
@@ -162,8 +221,9 @@ plot_protein_abundance <- function(
 #' colored by negative versus nonnegative log2 fold change; other points are gray. Missing
 #' statistics are omitted. An exact zero probability is plotted one log10 unit
 #' above the smallest positive probability in the contrast, or at machine
-#' precision when all plotted probabilities are zero. Annotated points are
-#' highlighted in orange, drawn over other points, and connected to their labels.
+#' precision when all plotted probabilities are zero. Annotated points retain
+#' their significance colors, are drawn over other points, and are connected
+#' to their labels.
 #'
 #' Protein labels can match a feature ID, complete source protein-group name,
 #' group member accession or name, or a mapped identifier. A term matching
@@ -299,7 +359,6 @@ plot_limma_volcano <- function(
     }
     colours <- stats::setNames(c("#777777", "#4C78A8", "#B24A59"),
         legend_labels)
-    annotated_colour <- "#D98C70"
     if (style == "BPG") {
         significant <- data$significant
         plot <- BoutrosLab.plotting.general::create.scatterplot(
@@ -343,7 +402,9 @@ plot_limma_volcano <- function(
                 lattice::panel.segments(annotated$logFC, annotated$negative_log10,
                     annotated$label_x, annotated$label_y, col = "#555555", lwd = 0.7)
                 lattice::panel.points(annotated$logFC, annotated$negative_log10,
-                    pch = 19, col = annotated_colour, cex = 0.8)
+                    pch = 19,
+                    col = unname(colours[as.character(annotated$significant)]),
+                    cex = 0.8)
                 lattice::panel.text(annotated$label_x, annotated$label_y,
                     labels = annotated$label, cex = 0.8, font = 2)
             }
@@ -382,7 +443,6 @@ plot_limma_volcano <- function(
             show.legend = FALSE
         ) + ggplot2::geom_point(
             data = annotated,
-            colour = annotated_colour,
             size = 1.8,
             alpha = 1,
             show.legend = FALSE

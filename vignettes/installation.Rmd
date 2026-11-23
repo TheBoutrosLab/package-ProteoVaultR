@@ -1,0 +1,46 @@
+---
+title: "Installing ProteoVaultR"
+---
+
+## 1. Install ProteoVaultR
+
+Run the following commands in R to install the package and its dependencies.
+
+```{r install-package, eval=FALSE}
+install.packages(c("BiocManager", "remotes"))
+
+BiocManager::install(
+    c("limma", "S4Vectors", "SummarizedExperiment"),
+    ask = FALSE,
+    update = FALSE
+)
+
+remotes::install_github("TheBoutrosLab/package-ProteoVaultR")
+```
+
+::: {.alert .alert-info role="note"}
+**Note:** ProteoVaultR requires DuckDB 2.0 or newer and dbplyr 2.6 or newer.
+The package declares these requirements and checks them during installation.
+:::
+
+## 2. Check the installation
+
+Load the package and check which version is installed:
+
+```{r check-installation, eval=FALSE}
+library(ProteoVaultR)
+packageVersion("ProteoVaultR")
+```
+
+If the package loads without an error and R prints a version number, you are
+ready to begin. You can also open the help page for the function used to connect
+to a database:
+
+```{r open-help, eval=FALSE}
+?open_vault
+```
+
+## 3. Get the demo data
+
+Next, follow [Downloading the demo data](demo-data.html) to choose a DIA, DDA LFQ,
+or TMT example database and save it for your analyses.

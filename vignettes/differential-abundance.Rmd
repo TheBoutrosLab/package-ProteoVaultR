@@ -1,231 +1,155 @@
 ---
-title: "Differential abundance with limma"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Differential abundance with limma}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+title: "Differential abundance"
 ---
 
-## Overview
+Which protein groups change between conditions? This guide compares the three
+IFNa-treated HepG2 samples with the three controls using `se` from
+[Preparing data](preparing-data.html).
 
-`fit_limma()` fits a limma linear model to a numeric assay in a
-`SummarizedExperiment`. Use `as_summarized_experiment()` to export one
-ProteoVault measurement source and method. The assay has features in rows and
-samples in columns; in-memory sample metadata becomes `colData`, which supplies
-the experimental conditions for the design.
-
-The default analysis converts positive intensities to log2 values, treats zero
-as missing, fits `limma::lmFit()`, applies `limma::contrasts.fit()`, and
-moderates variances with `limma::eBayes()`. It does not normalize, impute, or
-select significant features automatically. See the
+ProteoVaultR uses **limma** to fit a model for each protein group and share
+variance information across groups to stabilize the tests. See the
 [limma User's Guide](https://bioconductor.org/packages/release/bioc/vignettes/limma/inst/doc/usersguide.pdf)
-for the underlying statistical model.
+for the statistical background.
 
-## Prepare samples and one quantity assay
-
-The metadata `sample_name` values must exactly match the vault. List the
-stored names before preparing a mapping. The example below assumes a
-`sample_info` data frame with one row per sample and columns `sample_name`,
-`sample_id`, and `condition`.
-
-```{r, eval=FALSE}
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 library(ProteoVaultR)
-
-vault <- open_vault("P2042.proteovault.duckdb")
-sample_names <- dplyr::collect(
-    dplyr::select(tbl_vault(vault, "samples"), sample_name)
+library(dplyr)
+knitr::opts_chunk$set(
+    collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 4.5,
+    dev.args = list(bg = "white")
 )
-print(sample_names)
-
+data_dir <- Sys.getenv("PROTEOVAULTR_DEMO_DIR", unset = "demo-data")
+vault <- open_vault(
+    file.path(data_dir, "hepg2_ifna-dia.proteovault.duckdb")
+)
+sample_info <- tibble::tribble(
+    ~sample_name,   ~sample_id, ~condition,
+    "Control_R1",  "Ctrl1",    "Control",
+    "Control_R2",  "Ctrl2",    "Control",
+    "Control_R3",  "Ctrl3",    "Control",
+    "IFNa_12h_R1", "IFNa1",    "IFNa",
+    "IFNa_12h_R2", "IFNa2",    "IFNa",
+    "IFNa_12h_R3", "IFNa3",    "IFNa"
+)
+sample_info$condition <- factor(
+    sample_info$condition, levels = c("Control", "IFNa")
+)
 vault <- set_sample_metadata(vault, sample_info)
-se <- as_summarized_experiment(
-    vault,
-    level = "protein_group",
-    method = "PG.MaxLFQ"
-)
-
-table(SummarizedExperiment::colData(se)$condition)
-SummarizedExperiment::assayNames(se)
+se <- as_summarized_experiment(vault, method = "matrix")
 close_vault(vault)
 ```
 
-Choose one `source_id` when the requested method exists in multiple sources.
-`as_summarized_experiment()` preserves the chosen source and method in its
-metadata. In DIA, a peptide-level assay is derived from precursor quantities
-and requires an explicit `peptide_aggregation`. DDA ProteinQuantifier peptide
-measurements are exported directly and retain their source feature IDs.
+## 1. Choose the quantities
 
-## Label-blind stable-reference normalization
+Here we use the imported DIA-NN matrix in the `quantity` assay, the default for
+`fit_limma()`. Use the original intensity scale: the function applies log2 by
+default, treats zeros as missing, and passes missing values to limma.
 
-These functions select complete, abundant reference proteins without using
-sample groups. Supply raw protein intensities and exclude prespecified target
-proteins from reference selection. Each function adds a separate assay on the
-original intensity scale, so `fit_limma()` can apply its usual log2 transform.
+If you chose additional [normalization](normalization.html) or
+[imputation](missing-values.html), use the corresponding object and select its
+assay in the fitting call:
 
-```{r, eval=FALSE}
-se <- as_summarized_experiment(vault, level = "protein_group",
-    method = "PG.Quantity")
-se <- normalize_stable_reference_genorm(se,
-    exclude = c("sp|P48426|PI42A_HUMAN", "sp|P78356|PI42B_HUMAN"))
-se <- normalize_stable_reference_pca(se,
-    exclude = c("sp|P48426|PI42A_HUMAN", "sp|P78356|PI42B_HUMAN"))
+- For `se_genorm`, set `assay = "quantity_genorm_normalized"`.
+- For `se_imputed`, set `assay = "quantity_imputed"`.
 
-SummarizedExperiment::assayNames(se)
-SummarizedExperiment::colData(se)$reference_genorm_log2_offset
-SummarizedExperiment::rowData(se)$reference_pca_selected
+## 2. Define the comparison
 
-plot_stable_reference_diagnostics(se, method = "genorm")
-plot_stable_reference_diagnostics(se, method = "pca", style = "ggplot2")
+The `condition` column contains `Control` and `IFNa`, in that order. The formula
+below fits a mean for each condition, and the contrast specifies their difference:
+
+```{r define-contrast}
+design <- ~ 0 + condition
+contrasts <- list_limma_contrasts(se, design)
+contrasts
 ```
 
-The geNorm-style and PCA selections are alternative sensitivity analyses.
-Their selected feature IDs and settings are stored in `metadata(se)`.
+`IFNa_vs_Control` compares IFNa minus Control. Positive log2 fold changes mean
+higher abundance in IFNa; a value of 1 means a twofold increase.
+These are independent biological replicates, so the model does not pair samples
+by their replicate numbers.
 
-## Compare one treatment with DMSO
+## 3. Fit the model and read the results
 
-Suppose `condition` contains `DMSO`, `SBI-9456`, and other treatments. The
-formula `~ 0 + condition` estimates one mean per condition. The contrast below
-tests SBI-9456 against DMSO while retaining the other treatments in the model.
+Fit the contrast, then preview ten groups ranked by adjusted p-value. We keep a
+compact statistics table in `results`; `fit$results` retains all annotations.
 
-```{r, eval=FALSE}
-se$condition <- factor(se$condition,
-    levels = c("DMSO", "SBI-9456", "OtherTreatment"))
-
-available <- list_limma_contrasts(se, "~ 0 + condition")
-available
-
-fit <- fit_limma(
-    se,
-    design = ~ 0 + condition,
-    contrasts = c(SBI_vs_DMSO = "conditionSBI.9456 - conditionDMSO")
-)
-
-colnames(fit$design)
-fit$contrast_matrix
-head(fit$results)
-```
-
-The function makes design column names valid R names. Thus `SBI-9456` becomes
-`SBI.9456` in a contrast. Check `colnames(fit$design)` if an expression does
-not match. The contrast direction is treatment minus DMSO: positive `logFC`
-means higher treatment abundance. Because the input is log2 transformed by
-default, `logFC = 1` corresponds to a twofold difference.
-
-For several comparisons, provide several named expressions. Each is tested
-against the same fitted design, and the results contain a `contrast` column.
-
-```{r, eval=FALSE}
-fit <- fit_limma(
-    se,
-    design = ~ 0 + condition,
-    contrasts = c(
-        SBI_vs_DMSO = "conditionSBI.9456 - conditionDMSO",
-        Other_vs_DMSO = "conditionOtherTreatment - conditionDMSO"
+```{r fit-model, warning=FALSE}
+fit <- fit_limma(se, design = design, contrasts = contrasts)
+results <- fit$results %>%
+    select(feature_id, leading_gene_name, leading_protein_accession, logFC, P.Value, adj.P.Val)
+results %>%
+    arrange(adj.P.Val, P.Value) %>%
+    head(10) %>%
+    select(-feature_id) %>%
+    mutate(across(c(P.Value, adj.P.Val), ~ formatC(.x, format = "e", digits = 2))) %>%
+    knitr::kable(
+        col.names = c("Gene", "Leading protein", "Log2 fold change", "p-value", "Adjusted p-value"),
+        digits = 2
     )
-)
 ```
 
-## Interpret and inspect results
+`logFC` gives the estimated log2 fold change. `P.Value` is the unadjusted p-value;
+`adj.P.Val` applies the Benjamini–Hochberg adjustment across protein groups in
+this contrast. Each row still represents a protein group; the leading gene and
+protein provide labels.
 
-`fit$results` has one row per feature and contrast, in assay feature order.
-`feature_id` matches the assay row name. It includes `logFC`, `AveExpr`, `t`,
-`P.Value`, `adj.P.Val` (Benjamini–Hochberg adjustment within each contrast),
-`B`, and available feature annotations. Protein-group members and mapped IDs
-remain list columns; their many-to-many mappings do not duplicate tests.
+Here, `r sum(is.finite(results$P.Value))` of `r nrow(results)` groups have a finite
+p-value. Groups without enough measurements to estimate the comparison can have
+missing statistics.
 
-```{r, eval=FALSE}
-significant <- subset(fit$results,
-    contrast == "SBI_vs_DMSO" & adj.P.Val < 0.05)
-significant[order(significant$adj.P.Val),
-    c("feature_id", "source_group_id", "logFC", "P.Value", "adj.P.Val")]
+::: {.alert .alert-info role="note"}
+**Two different questions:** Identification FDR concerns which peptides or
+proteins were identified. The adjusted p-values here concern differences in
+abundance between conditions.
+:::
+
+## 4. Plot the comparison
+
+### 4.1. Inspect the p-value distribution
+
+```{r pvalue-histogram, fig.alt="Histogram of raw limma p-values for the HepG2 IFNa-versus-Control comparison."}
+plot_limma_pvalue_histogram(fit)
 ```
 
-`fit$fit` is the moderated limma fit, `fit$design` is the exact design matrix,
-`fit$contrast_matrix` records the comparisons, and `fit$settings` records
-transformation and moderation options. The result includes all tested features;
-the example threshold above is applied only for display.
+The histogram summarizes raw p-values across protein groups. An excess near zero
+can reflect a treatment response; interpret the pattern alongside sample QC and
+the experimental design.
 
-## Volcano plots
+### 4.2. Inspect effect sizes and significance
 
-`plot_limma_volcano()` displays log2 fold change against a transformed
-probability axis.
-It defaults to BH-adjusted q-values and the BPG style; select `"p_value"` for
-unadjusted p-values or `style = "ggplot2"` for a ggplot object. Values are
-positioned and labeled as `-log10(probability)`: `0`, `1`, `2`, and so forth.
-There are no grid lines.
-
-```{r, eval=FALSE}
-plot_limma_volcano(
-    fit,
-    contrast = "SBI_vs_DMSO",
-    significance = "q_value",
-    proteins = c("O75083", "P12345"),
-    label_by = "leading_gene_name"
-)
-
-plot_limma_volcano(
-    fit,
-    contrast = "SBI_vs_DMSO",
-    significance = "p_value",
-    style = "ggplot2"
-)
+```{r volcano, fig.alt="Volcano plot of log2 fold change against negative log10 BH-adjusted p-value for IFNa versus Control."}
+plot_limma_volcano(fit)
 ```
 
-`proteins` can contain exact feature IDs, complete protein-group names, group
-member accessions or names, or mapped identifiers. One identifier can match
-several groups, in which case all matching points are labeled. An unmatched
-identifier raises an error. The legend title identifies the selected probability
-type and shows `> cutoff`, `≤ cutoff; FC < 0`, and `≤ cutoff; FC ≥ 0`.
-Points at or below `cutoff` (default `0.05`) are colored by fold-change direction.
-Use `label_by` to display a character `rowData` column instead of the selected
-accession. Selected features need a value in that column. Nearby labels are
-placed at different heights to make them easier to read.
-Annotated points are orange, drawn over the other points, and connected to their labels.
+Groups on the right have higher abundance in IFNa; those on the left have lower
+abundance. Higher points have smaller adjusted p-values. By default, colored
+points meet the adjusted p-value cutoff of 0.05. Groups with missing statistics
+are omitted.
 
-## Protein precursor profiles
+## 5. Select and save results
 
-`plot_protein_precursor_quantity_lineplot()` shows every linked charged modified peptide for
-the selected proteins. Names on the protein vector become facet labels; the
-quantification method chooses the precursor measurements.
+For example, select groups with an adjusted p-value at or below 0.05:
 
-```{r, eval=FALSE}
-plot_protein_precursor_quantity_lineplot(vault,
-    proteins = c(PIP4K2A = "sp|P48426|PI42A_HUMAN",
-        PIP4K2B = "sp|P78356|PI42B_HUMAN"),
-    method = "Precursor.Normalised")
+```{r select-results}
+significant <- results %>% filter(adj.P.Val <= 0.05)
+nrow(significant)
 ```
 
-## P-value histogram
+Consider effect sizes and biological context alongside this threshold. `results`
+still contains every fitted row, including groups with missing statistics.
 
-`plot_limma_pvalue_histogram()` shows the raw p-value distribution for one
-contrast. Both styles use equal-width bins from 0 to 1; `bins` controls the
-number of bins.
+To save the unfiltered statistics table locally:
 
-```{r, eval=FALSE}
-plot_limma_pvalue_histogram(fit, contrast = "SBI_vs_DMSO")
-plot_limma_pvalue_histogram(fit, contrast = "SBI_vs_DMSO",
-    bins = 20, style = "ggplot2")
+```{r export-csv, eval=FALSE}
+write.csv(results, "IFNa_vs_Control-results.csv", row.names = FALSE)
 ```
-Missing statistics are omitted; a stored probability of zero is drawn just
-above the smallest positive probability so the plot remains finite.
 
-## Input and design checks
+To preserve the full fitted object, including its model, settings, and
+protein-group annotations:
 
-- The selected assay must contain comparable measurements from one source and
-  quantification method. Do not combine raw and normalized methods in one fit.
-- With `log2_transform = TRUE`, zeros become missing by default; negative and
-  infinite intensities are rejected. No pseudocount or imputation is applied.
-- Set `log2_transform = FALSE` for an assay that is already on a log2 scale.
-  Zeros are then retained unless `zero_as_missing = TRUE` is requested.
-- The design must have one row per sample, full column rank, and residual
-  degrees of freedom. Missing design variables cause an error.
-- Missing feature values are passed to limma. Inspect feature coverage before
-  interpreting a contrast, especially if one group has few observed values.
-- `trend = TRUE` enables limma's mean-variance trend; `robust = TRUE` enables
-  robust empirical Bayes moderation. Use them based on diagnostics, not as
-  automatic defaults.
+```{r save-fit, eval=FALSE}
+saveRDS(fit, "IFNa_vs_Control-fit.rds")
+```
 
-The same interface accepts `level = "precursor"` or a peptide assay exported
-with an explicit precursor aggregation rule. These levels answer different
-biological questions; a precursor result is not a peptide or protein result.
+Next, [Exploring proteins](exploring-proteins.html) follows up on ISG20 with
+sample quantities, precursor profiles, and sequence coverage.

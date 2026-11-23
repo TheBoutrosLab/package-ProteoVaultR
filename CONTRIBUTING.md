@@ -1,5 +1,9 @@
 # Contributing
 
-Document public functions with roxygen2 and regenerate NAMESPACE/man files with `roxygen2::roxygenise()`. Run `testthat::test_local()` and R CMD check before proposing changes.
+We welcome bug reports, feature requests, and pull requests to improve ProteoVaultR.
 
-Use four-space indentation, `%>%`, and named arguments in multiline calls. Preserve lazy queries until an explicit collection, matrix, or summary operation. Keep source/method/stage distinctions and protein-group memberships explicit. Analysis functions must not save figures or rewrite input databases.
+- [Report a bug](https://github.com/TheBoutrosLab/package-ProteoVaultR/issues/new): describe what happened and, when possible, include a small example that reproduces the problem.
+- [Request a feature](https://github.com/TheBoutrosLab/package-ProteoVaultR/issues/new): tell us what you would like to do and how it would help your analysis.
+- [Submit a pull request](https://github.com/TheBoutrosLab/package-ProteoVaultR/compare): contributions to the code and documentation are welcome.
+
+Thank you for helping improve ProteoVaultR!

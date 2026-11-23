@@ -1,0 +1,124 @@
+# Based on https://github.com/r-lib/actions/blob/v2/examples/pkgdown.yaml
+name: pkgdown
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pkgdown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    concurrency:
+      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+      cancel-in-progress: false
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PROTEOVAULTR_DEMO_DIR: ${{ github.workspace }}/vignettes/demo-data
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Restore DIA demo database
+        id: demo-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: vignettes/demo-data/hepg2_ifna-dia.proteovault.duckdb
+          key: proteovaultr-demo-v2-${{ hashFiles('.github/demo-data.json') }}
+
+      - name: Verify cached DIA data and download if needed
+        run: python3 .github/scripts/prepare-demo-data.py
+
+      # Save the verified input before R setup/build so an unrelated failure
+      # does not force another S3 download. PRs restore but do not save caches.
+      - name: Cache verified DIA demo database
+        if: github.event_name != 'pull_request' && steps.demo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: vignettes/demo-data/hepg2_ifna-dia.proteovault.duckdb
+          key: ${{ steps.demo-cache.outputs.cache-primary-key }}
+
+      - name: Install Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes pandoc
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Identify R version
+        id: r-version
+        shell: Rscript {0}
+        run: |
+          cat("version=", as.character(getRversion()), "\n",
+              sep = "", file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+
+      - name: Cache R packages
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: pkgdown-r-${{ runner.os }}-${{ runner.arch }}-${{ steps.r-version.outputs.version }}-${{ hashFiles('DESCRIPTION', '.github/workflows/pkgdown.yaml') }}
+
+      # setup-r-dependencies also references a Quarto action that is not allowed
+      # by this repository's Actions policy, even when Quarto is unused.
+      - name: Install R dependencies and package
+        shell: Rscript {0}
+        run: |
+          if (!requireNamespace("pak", quietly = TRUE)) install.packages("pak")
+          pak::pkg_install(c("local::.", "pkgdown"), dependencies = TRUE, ask = FALSE)
+
+      - name: Build site with executed demo analyses
+        shell: Rscript {0}
+        run: |
+          pkgdown::build_site_github_pages(
+            dest_dir = "docs/site",
+            new_process = FALSE,
+            install = FALSE
+          )
+
+      - name: Check published files
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          site = Path("docs/site")
+          assert (site / "index.html").is_file(), "Missing site home page"
+          assert not list(site.rglob("*.duckdb")), "Demo databases must not be published"
+          assert not (site / "_build").exists(), "Local plans must not be published"
+          PYTHON
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs/site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: pkgdown
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pkgdown-pages-deploy
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Publish site
+        id: deployment
+        uses: actions/deploy-pages@v4

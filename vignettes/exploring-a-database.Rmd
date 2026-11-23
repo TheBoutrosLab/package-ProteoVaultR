@@ -1,0 +1,223 @@
+---
+title: "Exploring a database"
+---
+
+Once you have [downloaded the demo data](demo-data.html), take a few minutes to
+get familiar with the results. This guide uses the HepG2 DIA database to inspect
+the experiment, find available measurements, and retrieve a small table in R.
+Run the examples in order in the same R session. The tables below are generated
+from the demo database when this article is built.
+
+## 1. Open the database
+
+Load ProteoVaultR and dplyr, then open the file you downloaded. Here we use the
+`demo-data` directory from the download guide; adjust the path if you saved the
+file elsewhere. For documentation builds, `PROTEOVAULTR_DEMO_DIR` can point to
+the directory containing the cached databases.
+
+```{r setup, include=FALSE}
+library(ProteoVaultR)
+library(dplyr)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r open-vault}
+data_dir <- Sys.getenv("PROTEOVAULTR_DEMO_DIR", unset = "demo-data")
+vault <- open_vault(
+    path = file.path(data_dir, "hepg2_ifna-dia.proteovault.duckdb")
+)
+vault
+```
+
+`vault` is your connection to the database. Printing it gives a short description
+of the dataset, schema version, available layers, and file location. Opening it
+does not load all the measurements into R, and the database remains read-only.
+
+::: {.alert .alert-warning role="note"}
+**Keep the connection open:** The queries below use `vault` to read the database.
+Close it after you have collected the results you need.
+:::
+
+## 2. Inspect the experiment
+
+Use `vault_info()` to see how the database was assembled:
+
+```{r inspect-vault}
+info <- vault_info(vault)
+info$analysis %>%
+    select(dataset_id, pipeline, pipeline_version) %>%
+    knitr::kable(
+        col.names = c("Dataset", "Pipeline", "Version")
+    )
+```
+
+The imported layers tell you which additional results are available:
+
+```{r inspect-layers}
+info$layers
+```
+
+
+`info$analysis` records the dataset and pipeline version. Layers describe the
+kinds of results imported into the database. Additional layers may contain QC
+metrics, protein sequences, or annotations; not every database includes them all.
+
+### 2.1. Look at samples and acquisition runs
+
+Read the sample names stored in the database:
+
+```{r inspect-samples}
+samples <- tbl_vault(vault, "samples") %>%
+    select(sample_id, sample_name) %>%
+    arrange(sample_name) %>%
+    collect()
+
+samples %>%
+    knitr::kable(
+        col.names = c("Sample ID", "Sample name")
+    )
+```
+
+Use these names when you add experimental metadata later. For the HepG2 DIA
+example, each sample corresponds to an unfractionated acquisition. A fractionated
+experiment can have several runs per sample, so it is useful to inspect both:
+
+```{r inspect-runs}
+runs <- tbl_vault(vault, "runs") %>%
+    select(run_id, sample_id, run_name, file_name) %>%
+    collect()
+
+runs %>%
+    knitr::kable(
+        col.names = c("Run ID", "Sample ID", "Run name", "File name")
+    )
+```
+
+::: {.alert .alert-info role="note"}
+**TMT samples and runs:** One acquisition measures a plex containing several
+reporter channels. Quantitative sample names use `<plex_id>|<reporter_label>`,
+so a run and a quantitative sample represent different parts of the experiment.
+:::
+
+### 2.2. See the available tables
+
+```{r inspect-tables}
+list_vault_tables(vault)
+```
+
+This lists the tables and views present in the open database. `tbl_vault()` lets
+you inspect one by name. For common tasks, the dedicated query functions below
+provide a more convenient starting point.
+
+## 3. Find the measurements you need
+
+ProteoVault keeps track of both the **source file** and the **measurement method**.
+A source identifies an imported result file; a method identifies the quantity it
+provides, such as a matrix value or a particular report quantity. Inspect them
+before deciding which measurements to use.
+
+```{r inspect-methods}
+measurements <- tbl_vault(vault, "source_quant_methods") %>%
+    inner_join(tbl_vault(vault, "quant_methods"), by = "method_id") %>%
+    inner_join(tbl_vault(vault, "source_files"), by = "source_id") %>%
+    select(level, method = name, source_id, relative_path) %>%
+    arrange(level, method, relative_path) %>%
+    collect()
+
+measurements %>%
+    mutate(relative_path = basename(relative_path)) %>%
+    knitr::kable(
+        col.names = c("Level", "Method", "Source ID", "Source file")
+    )
+```
+
+The `level` column distinguishes protein-group, peptide, and precursor quantities.
+The available methods depend on the workflow and imported files. This inventory
+helps you choose a method without guessing from a filename.
+
+| What you want to explore | Function |
+| --- | --- |
+| Protein-group quantities | `tbl_protein_quant()` |
+| Native peptide quantities from DDA ProteinQuantifier | `tbl_peptide_quant()` |
+| Precursor quantities | `tbl_precursor_quant()` |
+| Validated peptide-spectrum matches | `tbl_psms()` |
+| Protein groups and their members | `tbl_protein_groups()` and `tbl_group_members()` |
+
+A precursor is a modified peptide with a particular charge. DIA peptide-level
+summaries are derived from precursor quantities when preparing an assay; they are
+not the native DDA peptide measurements returned by `tbl_peptide_quant()`.
+
+## 4. Retrieve a small table
+
+For the HepG2 DIA example, start with protein-group quantities from the imported
+matrix. Select the matching source explicitly:
+
+```{r select-quantities}
+method <- "matrix"
+source_id <- resolve_quant_source(
+    vault,
+    level = "protein_group",
+    method = method
+)
+
+protein_quant <- tbl_protein_quant(
+    vault,
+    source_id = source_id,
+    method = method
+)
+
+source_id
+```
+
+::: {.alert .alert-warning role="note"}
+**Choose the matching source:** If several sources provide the requested method,
+select a `source_id` from the measurement inventory. For another dataset or
+quantity, use the method and source recorded in that database.
+:::
+
+Now select positive quantities from the first sample and retrieve just ten rows:
+
+```{r preview-quantities}
+first_sample <- samples$sample_name[[1L]]
+
+preview <- protein_quant %>%
+    filter(sample_name == first_sample, quantity > 0) %>%
+    select(sample_name, source_group_id, quantity) %>%
+    arrange(source_group_id) %>%
+    head(10) %>%
+    collect()
+
+preview %>%
+    knitr::kable(
+        col.names = c("Sample", "Protein group", "Quantity"),
+        digits = 2
+    )
+```
+
+Here, `source_group_id` is the original protein-group label and `quantity` is the
+stored measurement. These are group-level quantities; a group can contain more
+than one protein.
+
+Until `collect()`, this is a **lazy query**: filtering and selection take place in
+DuckDB. `collect()` brings the selected rows into an R table.
+
+::: {.alert .alert-info role="note"}
+**Tip:** Filter and limit rows before calling `collect()`. Here, `head(10)` keeps
+the preview small even when the database contains many results.
+:::
+
+## 5. Close the connection
+
+```{r close-vault}
+close_vault(vault)
+vault
+```
+
+The collected `samples`, `runs`, `measurements`, and `preview` tables remain
+available in R. The lazy `protein_quant` query needs an open connection; reopen
+the database and recreate the query if you want to continue using it.
+
+You now know how to find and retrieve results. Continue with [Preparing data](preparing-data.html) to connect those
+measurements with your sample metadata and prepare a quantitative matrix for
+analysis. For more about any function used here, see the
+[function reference](../reference/index.html).

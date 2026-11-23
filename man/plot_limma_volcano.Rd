@@ -49,7 +49,8 @@ colored by negative versus nonnegative log2 fold change; other points are gray. 
 statistics are omitted. An exact zero probability is plotted one log10 unit
 above the smallest positive probability in the contrast, or at machine
 precision when all plotted probabilities are zero.
-Annotated points are highlighted in orange, drawn over other points, and connected to their labels.
+Annotated points retain their significance colors, are drawn over other
+points, and are connected to their labels.
 }
 \details{
 Protein labels can match a feature ID, complete source protein-group name,

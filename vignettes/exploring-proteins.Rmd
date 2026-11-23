@@ -1,0 +1,99 @@
+---
+title: "Exploring proteins"
+---
+
+After [differential abundance analysis](differential-abundance.html), look more
+closely at individual results. Here we follow ISG20 through its sample quantities,
+precursor profiles, and supporting peptide identifications in the HepG2 DIA demo.
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(ProteoVaultR)
+knitr::opts_chunk$set(
+    collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 4.5,
+    dev.args = list(bg = "white")
+)
+sample_info <- tibble::tribble(
+    ~sample_name,   ~sample_id, ~condition,
+    "Control_R1",  "Ctrl1",    "Control",
+    "Control_R2",  "Ctrl2",    "Control",
+    "Control_R3",  "Ctrl3",    "Control",
+    "IFNa_12h_R1", "IFNa1",    "IFNa",
+    "IFNa_12h_R2", "IFNa2",    "IFNa",
+    "IFNa_12h_R3", "IFNa3",    "IFNa"
+)
+sample_info$condition <- factor(
+    sample_info$condition, levels = c("Control", "IFNa")
+)
+```
+
+## 1. Choose a protein
+
+Reopen the database and attach `sample_info` from
+[Preparing data](preparing-data.html). Use the exact `source_group_id` from
+`fit$results` to select a protein group:
+
+```{r select-protein}
+data_dir <- Sys.getenv("PROTEOVAULTR_DEMO_DIR", unset = "demo-data")
+vault <- open_vault(file.path(data_dir, "hepg2_ifna-dia.proteovault.duckdb"))
+vault <- set_sample_metadata(vault, sample_info)
+protein <- "sp|Q96AZ6|ISG20_HUMAN"
+protein
+```
+
+ISG20 is a single-protein group in this demo, so the same identifier also selects
+its sequence. For a group with several members, select an individual member's
+accession for the coverage plot.
+
+::: {.alert .alert-info role="note"}
+**Stored quantities:** These plots read the database. Any additional normalization
+or imputation you applied to `se` stays in that R object.
+:::
+
+## 2. Compare sample quantities
+
+```{r protein-abundance, fig.alt="ISG20 protein-group quantities across three control and three IFNa-treated HepG2 samples."}
+plot_protein_abundance(vault, protein)
+```
+
+ISG20 has higher recorded abundance in all three IFNa samples. Check whether a
+change is consistent across replicates when reviewing your own results.
+
+## 3. Inspect precursor profiles
+
+Look at the precursor measurements associated with the group. This demo stores
+precursor quantities in `matrix`, so select that method:
+
+```{r precursor-profiles, fig.width=9, fig.height=5.5, fig.alt="Log2 quantity profiles for the modified peptide and charge-state precursors associated with ISG20."}
+plot_protein_precursor_quantity_lineplot(vault, protein, method = "matrix")
+```
+
+Each line represents a modified peptide and charge state. Profiles measured in
+both conditions generally increase in IFNa, agreeing with the group-level result.
+Only positive quantities are drawn; lines can span missing samples, so check the
+points as well. The x-axis lists independent replicates, grouped by condition.
+
+## 4. Examine sequence coverage
+
+Map validated peptide identifications onto the stored protein sequence:
+
+```{r sequence-coverage, fig.width=9, fig.height=7, fig.alt="ISG20 sequence coverage from validated peptide identifications, shown separately for each sample with observed modifications marked."}
+plot_protein_coverage(vault, protein)
+```
+
+Each sequence row has a coverage strip for every sample. The subtitle pools
+coverage across samples, while the sample labels report their individual coverage.
+Markers show observed modifications. Use this view to inspect supporting
+identifications alongside the quantity plots.
+
+::: {.alert .alert-info role="note"}
+**Peptide specificity:** A uniquely placed peptide matches one position within
+this sequence. Peptides shared with other proteins can still contribute to
+coverage, so consider protein-group membership when interpreting the plot.
+:::
+
+Close the connection when you have finished:
+
+```{r close-vault}
+close_vault(vault)
+vault
+```

@@ -1,0 +1,122 @@
+# Add the deployed site URL when GitHub Pages is configured.
+destination: docs/site
+
+template:
+  bootstrap: 5
+
+home:
+  title: Analyze proteomics results with ProteoVaultR
+
+navbar:
+  structure:
+    left: [articles, reference, changelog]
+    right: [search, github]
+  components:
+    articles:
+      text: Articles
+      menu:
+        - text: Overview
+          href: articles/overview.html
+        - text: Installation
+          href: articles/installation.html
+        - text: Downloading the demo data
+          href: articles/demo-data.html
+        - text: Exploring a database
+          href: articles/exploring-a-database.html
+        - text: Preparing data
+          href: articles/preparing-data.html
+        - text: Quality control
+          href: articles/qc.html
+        - text: Normalization
+          href: articles/normalization.html
+        - text: Missing values
+          href: articles/missing-values.html
+        - text: Differential abundance
+          href: articles/differential-abundance.html
+        - text: Exploring proteins
+          href: articles/exploring-proteins.html
+    changelog:
+      text: Changelog
+      href: CHANGELOG.html
+
+articles:
+  - title: Articles
+    contents:
+      - overview
+      - installation
+      - demo-data
+      - exploring-a-database
+      - preparing-data
+      - qc
+      - normalization
+      - missing-values
+      - differential-abundance
+      - exploring-proteins
+
+reference:
+  - title: Package overview
+    contents:
+      - ProteoVaultR-package
+  - title: Open and inspect a database
+    contents:
+      - open_vault
+      - close_vault
+      - vault_info
+      - vault_schema
+      - check_schema
+      - list_vault_tables
+      - vault_connection
+      - print.proteovault
+  - title: Query results and provenance
+    contents:
+      - tbl_vault
+      - tbl_protein_quant
+      - tbl_peptide_quant
+      - tbl_precursor_quant
+      - tbl_psms
+      - tbl_psm_scores
+      - tbl_protein_groups
+      - tbl_group_members
+      - tbl_protein_identifiers
+      - tbl_qc_metrics
+      - resolve_quant_source
+      - require_layer
+  - title: Prepare samples and quantitative matrices
+    contents:
+      - set_sample_metadata
+      - sample_metadata
+      - matrix_protein_abundance
+      - matrix_peptide_abundance
+      - matrix_precursor_abundance
+      - matrix_quant
+      - as_summarized_experiment
+  - title: Plot styling
+    contents:
+      - theme_boutroslab
+  - title: Assess data quality
+    contents:
+      - summarize_quantified_counts
+      - summarize_quantification_coverage
+      - plot_protein_quantity_distribution
+      - plot_peptide_quantity_distribution
+      - plot_precursor_quantity_distribution
+      - plot_qc_metric
+      - plot_qc_boxplot
+      - plot_qc_charge_psm_counts
+  - title: Normalize and handle missing values
+    contents:
+      - normalize_stable_reference_genorm
+      - normalize_stable_reference_pca
+      - plot_stable_reference_diagnostics
+      - impute_conditional_lod
+  - title: Compare experimental conditions
+    contents:
+      - list_limma_contrasts
+      - fit_limma
+      - plot_limma_volcano
+      - plot_limma_pvalue_histogram
+  - title: Explore individual proteins
+    contents:
+      - plot_protein_abundance
+      - plot_protein_precursor_quantity_lineplot
+      - plot_protein_coverage

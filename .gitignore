@@ -307,3 +307,10 @@ work/
 *.~vsd*
 
 tests/files
+# Generated pkgdown site and vignette output
+/docs/site/
+/inst/doc/
+/vignettes/*.html
+/vignettes/*.R
+
+demo-data
