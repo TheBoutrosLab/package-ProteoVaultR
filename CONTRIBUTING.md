@@ -82,8 +82,8 @@ directory is excluded from both Git and package archives.
 ## Documentation workflow
 
 `.github/workflows/pkgdown.yaml` builds on pull requests, pushes to `main`, and
-manual dispatch. It uses the maintained r-lib setup actions and caches R
-dependencies separately from the DIA demo database. Analysis code executes on
+manual dispatch. It uses r-lib to set up R, installs dependencies with pak,
+and caches R packages separately from the DIA demo database. Analysis code executes on
 every build. Pull requests build without publishing or saving demo-data caches;
 every successful build uploads `docs/site/` as a Pages artifact. A separate
 job publishes that artifact only from `main`, using GitHub's official Pages

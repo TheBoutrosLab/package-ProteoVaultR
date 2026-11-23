@@ -57,10 +57,26 @@ jobs:
         with:
           use-public-rspm: true
 
-      - uses: r-lib/actions/setup-r-dependencies@v2
+      - name: Identify R version
+        id: r-version
+        shell: Rscript {0}
+        run: |
+          cat("version=", as.character(getRversion()), "\n",
+              sep = "", file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+
+      - name: Cache R packages
+        uses: actions/cache@v5
         with:
-          extra-packages: any::pkgdown, local::.
-          needs: website
+          path: ${{ env.R_LIBS_USER }}
+          key: pkgdown-r-${{ runner.os }}-${{ runner.arch }}-${{ steps.r-version.outputs.version }}-${{ hashFiles('DESCRIPTION', '.github/workflows/pkgdown.yaml') }}
+
+      # setup-r-dependencies also references a Quarto action that is not allowed
+      # by this repository's Actions policy, even when Quarto is unused.
+      - name: Install R dependencies and package
+        shell: Rscript {0}
+        run: |
+          if (!requireNamespace("pak", quietly = TRUE)) install.packages("pak")
+          pak::pkg_install(c("local::.", "pkgdown"), dependencies = TRUE, ask = FALSE)
 
       - name: Build site with executed demo analyses
         shell: Rscript {0}
