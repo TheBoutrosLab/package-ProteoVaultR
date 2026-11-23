@@ -1,0 +1,90 @@
+# Based on https://github.com/r-lib/actions/blob/v2/examples/pkgdown.yaml
+name: pkgdown
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pkgdown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    concurrency:
+      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: write
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PROTEOVAULTR_DEMO_DIR: ${{ github.workspace }}/vignettes/demo-data
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Restore DIA demo database
+        id: demo-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: vignettes/demo-data/hepg2_ifna-dia.proteovault.duckdb
+          key: proteovaultr-demo-v2-${{ hashFiles('.github/demo-data.json') }}
+
+      - name: Verify cached DIA data and download if needed
+        run: python3 .github/scripts/prepare-demo-data.py
+
+      # Save the verified input before R setup/build so an unrelated failure
+      # does not force another S3 download. PRs restore but do not save caches.
+      - name: Cache verified DIA demo database
+        if: github.event_name != 'pull_request' && steps.demo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: vignettes/demo-data/hepg2_ifna-dia.proteovault.duckdb
+          key: ${{ steps.demo-cache.outputs.cache-primary-key }}
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgdown, local::.
+          needs: website
+
+      - name: Build site with executed demo analyses
+        shell: Rscript {0}
+        run: |
+          pkgdown::build_site_github_pages(
+            dest_dir = "docs/site",
+            new_process = FALSE,
+            install = FALSE
+          )
+
+      - name: Check published files
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          site = Path("docs/site")
+          assert (site / "index.html").is_file(), "Missing site home page"
+          assert not list(site.rglob("*.duckdb")), "Demo databases must not be published"
+          assert not (site / "_build").exists(), "Local plans must not be published"
+          PYTHON
+
+      - name: Publish to gh-pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
+        with:
+          branch: gh-pages
+          folder: docs/site
+          clean: true

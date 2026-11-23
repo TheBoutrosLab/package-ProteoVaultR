@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a pkgdown site with ten executed-data guides, grouped function reference, and a README table of contents (2026-11-23).
+- Add a pkgdown workflow with a checksum-verified HepG2 DIA cache, S3 fallback downloads, and publication from `docs/site/` (2026-11-23).
+- Add `theme_boutroslab()` and native DDA peptide quantity-distribution plots (2026-11-23).
+
+### Fixed
+
+- Plot TMT QC channels separately in plex/reporter order and retain significance colors on labeled volcano points (2026-11-23).
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

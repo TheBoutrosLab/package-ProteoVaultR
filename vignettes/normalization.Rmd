@@ -1,0 +1,84 @@
+---
+title: "Normalization"
+---
+
+After [quality control](qc.html), decide whether your quantities need any further
+adjustment before comparing conditions.
+
+::: {.alert .alert-info role="note"}
+**DIA-NN usually normalizes already:** DIA-NN reports normalized quantities by
+default, so an additional normalization step is optional. You can continue with
+the imported matrix if it suits your analysis. See the
+[DIA-NN documentation](https://github.com/vdemichev/DiaNN#quantification).
+:::
+
+If an additional adjustment is useful, ProteoVaultR provides **stable-reference
+normalization**. It selects abundant protein groups measured in every sample and
+uses their collective abundance to calculate a scaling factor for each sample.
+
+The examples below continue with the HepG2 protein-group `se` from
+[Preparing data](preparing-data.html). Use its original `quantity` assay without
+log-transforming it first; the functions handle that internally.
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(ProteoVaultR)
+knitr::opts_chunk$set(
+    collapse = TRUE, comment = "#>", fig.width = 8, fig.height = 4.5,
+    dev.args = list(bg = "white")
+)
+data_dir <- Sys.getenv("PROTEOVAULTR_DEMO_DIR", unset = "demo-data")
+vault <- open_vault(
+    file.path(data_dir, "hepg2_ifna-dia.proteovault.duckdb")
+)
+sample_info <- tibble::tribble(
+    ~sample_name,   ~sample_id, ~condition,
+    "Control_R1",  "Ctrl1",    "Control",
+    "Control_R2",  "Ctrl2",    "Control",
+    "Control_R3",  "Ctrl3",    "Control",
+    "IFNa_12h_R1", "IFNa1",    "IFNa",
+    "IFNa_12h_R2", "IFNa2",    "IFNa",
+    "IFNa_12h_R3", "IFNa3",    "IFNa"
+)
+sample_info$condition <- factor(
+    sample_info$condition, levels = c("Control", "IFNa")
+)
+vault <- set_sample_metadata(vault, sample_info)
+se <- as_summarized_experiment(vault, method = "matrix")
+close_vault(vault)
+```
+
+## 1. Apply stable-reference normalization
+
+The geNorm-style method selects proteins with stable abundance ratios to one
+another. Normalize a copy of `se`, then inspect the adjustment:
+
+```{r genorm-normalization, fig.alt="Before-and-after profiles of selected geNorm reference proteins against all completely measured proteins in the HepG2 DIA dataset."}
+se_genorm <- normalize_stable_reference_genorm(se)
+plot_stable_reference_diagnostics(se_genorm)
+```
+
+Gray violins show the proteins measured in every sample. Blue profiles and boxes
+show the selected references. Each protein's log2 abundance is centered on its
+own mean across samples, so the panels show relative sample patterns before and
+after normalization. The before-and-after profiles are very similar in this demo.
+
+The result adds `quantity_genorm_normalized` while preserving the original
+`quantity` assay. The normalized quantities remain on the intensity scale.
+
+Reference selection does not use the sample conditions. Inspect the broader
+protein distribution as well as the references: closer alignment of the selected
+references is expected because they were used to calculate the adjustment. It
+does not establish that they are biologically unchanged.
+
+PCA-based reference selection is also available through
+`normalize_stable_reference_pca()`; see its function reference for the selection
+settings.
+
+## 2. Continue with your chosen quantities
+
+If you keep the additional normalization, use `quantity_genorm_normalized` in
+subsequent analysis. Otherwise, continue with the original `quantity` assay.
+
+This step does not impute missing values. In the new normalized assay, zeros are
+treated as missing and existing missing values remain missing. Next, see
+[Missing values](missing-values.html) before testing differences between conditions.

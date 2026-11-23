@@ -1,0 +1,11 @@
+{
+  "datasets": [
+    {
+      "id": "dia",
+      "filename": "hepg2_ifna-dia.proteovault.duckdb",
+      "url": "https://boutroslab-public.s3.amazonaws.com/test-data/spectromesa/hepg2_ifna-dia.proteovault.duckdb",
+      "sha256": "fc22b77a8322d4c7fe1fc7b2d66162d5a9e8f7799d9dba6796f204822d233977",
+      "bytes": 591409152
+    }
+  ]
+}

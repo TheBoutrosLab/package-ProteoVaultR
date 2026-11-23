@@ -1,0 +1,159 @@
+---
+title: "Downloading the demo data"
+---
+
+The demo databases let you explore real SpectroMesa results without running the
+mass spectrometry pipelines yourself. They cover two experiments: an interferon
+response in HepG2 cells, measured by both DIA and DDA, and an MTM1 experiment in
+HeLa cells measured with TMT.
+
+## 1. About the datasets
+
+### 1.1. HepG2: interferon response measured by DIA and DDA LFQ
+
+These data come from the study by Zou and colleagues comparing DDA and DIA
+proteomics. The demo selection contains three control samples and three samples
+treated with **100 ng/mL interferon α-2a for 12 hours**. Each acquisition mode has
+its own database, so you can follow the same biological comparison using DIA or
+DDA label-free results. [1](#ref-1)
+
+The original data are available through iProX under
+[IPX0013929001](https://www.iprox.cn/page/project.html?id=IPX0013929000).
+DDA and DIA were acquired in separate batches; treat them as separate analyses
+when working through the examples.
+
+### 1.2. HeLa: MTM1 and TMT quantitation
+
+These data come from Jang and colleagues' study of how endosomal lipid signaling
+connects nutrient availability with organelle structure and mitochondrial
+function. The demo uses the **fed-cell TMT10 plex**, acquired across **12
+fractions**, from the deposited HeLa experiment. It includes control and MTM1
+knockout samples, alongside siMTM1 samples and a pooled reference channel.
+[2](#ref-2)
+
+The original data are available through PRIDE under
+[PXD033850](https://www.ebi.ac.uk/pride/archive/projects/PXD033850). The full study
+also includes starvation experiments; the demo selects the fed plex.
+
+## 2. Processing with SpectroMesa
+
+We reprocessed the selected raw data with the SpectroMesa versions below, then
+assembled the results into DuckDB databases with
+[ProteoVault](https://github.com/TheBoutrosLab/package-ProteoVault). These downloads
+contain our SpectroMesa results, rather than the original authors' result tables.
+
+| Demo dataset | Pipeline used |
+| --- | --- |
+| HepG2 DIA | [SpectroMesa-DIA v1.6.2](https://github.com/TheBoutrosLab/SpectroMesa-DIA/releases/tag/v1.6.2) |
+| HepG2 DDA LFQ | [SpectroMesa-DDA v1.3.2](https://github.com/TheBoutrosLab/SpectroMesa-DDA/releases/tag/v1.3.2), with label-free quantitation |
+| HeLa TMT | [SpectroMesa-DDA v1.3.2](https://github.com/TheBoutrosLab/SpectroMesa-DDA/releases/tag/v1.3.2), with TMT quantitation |
+
+## 3. Download the databases
+
+Choose the dataset you want to explore, or download all three. The databases are
+hosted in the Boutros Lab public S3 bucket and total approximately **1.2 GB**.
+Public downloads do not require an AWS account or credentials.
+
+| Dataset | Database |
+| --- | --- |
+| HepG2 DIA | [hepg2_ifna-dia.proteovault.duckdb](https://boutroslab-public.s3.amazonaws.com/test-data/spectromesa/hepg2_ifna-dia.proteovault.duckdb) |
+| HepG2 DDA LFQ | [hepg2_ifna-lfq.proteovault.duckdb](https://boutroslab-public.s3.amazonaws.com/test-data/spectromesa/hepg2_ifna-lfq.proteovault.duckdb) |
+| HeLa TMT | [hela_mtm1-tmt.proteovault.duckdb](https://boutroslab-public.s3.amazonaws.com/test-data/spectromesa/hela_mtm1-tmt.proteovault.duckdb) |
+
+Use the links above or run the R commands below. The code on this page is not
+executed when the documentation is built.
+
+### 3.1. Choose a download directory
+
+Run the following in R from the directory where you want to work on the example
+analyses. This creates a `demo-data` folder for the databases. You can replace
+`"demo-data"` with another location if you prefer.
+
+```{r download-directory, eval=FALSE}
+data_dir <- "demo-data"
+dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+
+base_url <- "https://boutroslab-public.s3.amazonaws.com/test-data/spectromesa"
+files <- c(
+    tmt = "hela_mtm1-tmt.proteovault.duckdb",
+    dia = "hepg2_ifna-dia.proteovault.duckdb",
+    lfq = "hepg2_ifna-lfq.proteovault.duckdb"
+)
+
+# Allow more time for these large downloads.
+options(timeout = max(3600, getOption("timeout")))
+```
+
+### 3.2. Download a dataset
+
+For the HepG2 DIA example, download the DIA database:
+
+```{r download-one, eval=FALSE}
+filename <- files[["dia"]]
+download.file(
+    url = paste(base_url, filename, sep = "/"),
+    destfile = file.path(data_dir, filename),
+    mode = "wb"
+)
+```
+
+Use `files[["lfq"]]` for HepG2 DDA LFQ or `files[["tmt"]]` for HeLa TMT.
+Each file is already a DuckDB database and does not need to be extracted.
+Keep the filenames unchanged so you can reuse the paths in later examples.
+
+To download all three instead, run:
+
+```{r download-all, eval=FALSE}
+for (filename in files) {
+    download.file(
+        url = paste(base_url, filename, sep = "/"),
+        destfile = file.path(data_dir, filename),
+        mode = "wb"
+    )
+}
+```
+
+::: {.alert .alert-info role="note"}
+**Tip:** Download each database once, then reuse the saved copy in later sessions.
+If a download is interrupted, rerun it and let it finish before opening the file.
+:::
+
+## 4. Open a downloaded database
+
+For example, open the HepG2 DIA database and inspect its contents:
+
+```{r open-demo, eval=FALSE}
+library(ProteoVaultR)
+
+vault <- open_vault(
+    path = file.path(data_dir, files[["dia"]])
+)
+vault_info(vault)
+close_vault(vault)
+```
+
+ProteoVaultR opens the database read-only. Close the connection when you have
+finished working with it. Continue with [Exploring a database](exploring-a-database.html)
+to learn how to inspect the experiment and retrieve results.
+
+## 5. S3 locations
+
+The original objects are:
+
+```text
+s3://boutroslab-public/test-data/spectromesa/hela_mtm1-tmt.proteovault.duckdb
+s3://boutroslab-public/test-data/spectromesa/hepg2_ifna-dia.proteovault.duckdb
+s3://boutroslab-public/test-data/spectromesa/hepg2_ifna-lfq.proteovault.duckdb
+```
+
+## 6. References
+
+1. <a id="ref-1"></a>Zou X, Wang L, Chen Y, et al. In-depth analysis of data
+   characteristics and comparative evaluation of DDA and DIA accuracy in label-free
+   quantitative proteomics of biological samples. *Clinical Proteomics*. 23, 2
+   (2026; first published December 2025).
+   [doi:10.1186/s12014-025-09572-2](https://doi.org/10.1186/s12014-025-09572-2).
+2. <a id="ref-2"></a>Jang W, Puchkov D, Samsó P, et al. Endosomal lipid signaling
+   reshapes the endoplasmic reticulum to control mitochondrial function.
+   *Science*. 378, eabq5209 (2022).
+   [doi:10.1126/science.abq5209](https://doi.org/10.1126/science.abq5209).

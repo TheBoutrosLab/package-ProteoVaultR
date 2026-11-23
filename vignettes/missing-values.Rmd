@@ -1,0 +1,94 @@
+---
+title: "Missing values"
+---
+
+A missing quantity means that a protein group was not quantified in that sample;
+it does not establish that the protein was absent. After [quality control](qc.html)
+and [normalization](normalization.html), decide whether to leave those gaps or
+impute selected values.
+
+::: {.alert .alert-warning role="note"}
+**Imputation is optional:** Use this approach when treating undetected signals as
+low abundance makes sense for your experiment. Imputed values are estimates.
+:::
+
+This example continues with the HepG2 protein-group `se` from
+[Preparing data](preparing-data.html), using the imported DIA-NN quantities.
+Keep the intensities on their original scale; do not log-transform them first.
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(ProteoVaultR)
+library(dplyr)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+data_dir <- Sys.getenv("PROTEOVAULTR_DEMO_DIR", unset = "demo-data")
+vault <- open_vault(
+    file.path(data_dir, "hepg2_ifna-dia.proteovault.duckdb")
+)
+sample_info <- tibble::tribble(
+    ~sample_name,   ~sample_id, ~condition,
+    "Control_R1",  "Ctrl1",    "Control",
+    "Control_R2",  "Ctrl2",    "Control",
+    "Control_R3",  "Ctrl3",    "Control",
+    "IFNa_12h_R1", "IFNa1",    "IFNa",
+    "IFNa_12h_R2", "IFNa2",    "IFNa",
+    "IFNa_12h_R3", "IFNa3",    "IFNa"
+)
+sample_info$condition <- factor(
+    sample_info$condition, levels = c("Control", "IFNa")
+)
+vault <- set_sample_metadata(vault, sample_info)
+se <- as_summarized_experiment(vault, method = "matrix")
+close_vault(vault)
+```
+
+## 1. Apply conditional imputation
+
+Conditional imputation uses consistency across replicates to decide when a
+low-abundance estimate may be reasonable. For example, a protein quantified in
+all three controls but none of the IFNa samples may have fallen below reliable
+quantification after treatment. Filling that wholly missing condition makes this
+pattern available for comparison.
+
+Requiring repeated observations helps keep isolated detections from driving the
+comparison. The low-abundance interpretation remains an assumption; imputation
+does not establish why the measurements are missing.
+
+Use `condition` to group biological replicates. For each protein group, the
+default behavior is to:
+
+- Keep a condition with at least two observed replicates, leaving any remaining
+  gaps missing (`observed`).
+- Fill a wholly missing condition only when another condition has at least two
+  observed replicates (`lod_imputed`).
+- Otherwise, set the whole condition to missing (`insufficient`), including any
+  single observed value.
+
+The fill value is a sample-specific limit-of-detection (LOD) estimate: half the
+smallest positive intensity observed in that sample. Zeros are treated as missing.
+
+```{r conditional-imputation}
+se_imputed <- impute_conditional_lod(se, bin = "condition")
+SummarizedExperiment::assayNames(se_imputed)
+```
+
+The original `quantity` assay is retained. The new `quantity_imputed` assay
+contains the result, including gaps that were left missing or masked.
+
+For additionally normalized data, use `se_genorm` and set
+`assay = "quantity_genorm_normalized"` instead.
+
+## 2. Check what changed
+
+The result records a status for each protein group in each condition. Summarize
+those statuses before continuing:
+
+```{r imputation-status}
+SummarizedExperiment::rowData(se_imputed) %>%
+    as.data.frame() %>%
+    count(imputation_status_Control, imputation_status_IFNa, name = "protein_groups") %>%
+    knitr::kable(col.names = c("Control", "IFNa", "Protein groups"))
+```
+
+For later analysis, select `assay = "quantity_imputed"` if you want to use these
+values. Keep the original assay for comparison. Next, compare conditions with
+[Differential abundance](differential-abundance.html).

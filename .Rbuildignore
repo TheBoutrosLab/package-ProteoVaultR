@@ -11,3 +11,16 @@
 ^\.Rproj\.user$
 ^tests/files$
 ^\.lintr$
+^_pkgdown\.yml$
+^pkgdown$
+^vignettes/demo-data\.Rmd$
+^vignettes/overview\.Rmd$
+^vignettes/installation\.Rmd$
+^vignettes/exploring-a-database\.Rmd$
+^vignettes/demo-data$
+^vignettes/preparing-data\.Rmd$
+^vignettes/qc\.Rmd$
+^vignettes/normalization\.Rmd$
+^vignettes/missing-values\.Rmd$
+^vignettes/differential-abundance\.Rmd$
+^vignettes/exploring-proteins\.Rmd$

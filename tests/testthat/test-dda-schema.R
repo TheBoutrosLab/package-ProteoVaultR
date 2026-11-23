@@ -62,6 +62,26 @@ test_that("DDA peptide and TMT schema are queryable", {
         method = "ProteinQuantifier"))$reported_n_peptides[[1]], 1)
     expect_equal(dplyr::collect(tbl_peptide_quant(vault))$source_peptide,
         rep("PEPTIDE(TMTpro)", 2))
+    peptide_plot <- plot_peptide_quantity_distribution(
+        vault, samples = c("plex_01|127N", "plex_01|126")
+    )
+    expect_s3_class(peptide_plot, "ggplot")
+    expect_equal(nrow(peptide_plot$data), 2L)
+    expect_equal(unique(as.character(peptide_plot$data$feature_id)), "1001")
+    expect_equal(levels(peptide_plot$data$sample_name),
+        c("plex_01|127N", "plex_01|126"))
+    expect_equal(peptide_plot$data$log2_quantity,
+        log2(peptide_plot$data$quantity))
+    expect_equal(peptide_plot$labels$y, "Log2 peptide quantity")
+    expect_silent(ggplot2::ggplot_build(peptide_plot))
+    peptide_raw <- plot_peptide_quantity_distribution(
+        vault, method = "ProteinQuantifier", plot_type = "violin",
+        transform = "none"
+    )
+    expect_equal(peptide_raw$data$plot_quantity, peptide_raw$data$quantity)
+    expect_s3_class(peptide_raw$layers[[1L]]$geom, "GeomViolin")
+    expect_error(plot_peptide_quantity_distribution(vault, method = "matrix"),
+        "peptide")
     precursor_rows <- dplyr::collect(dplyr::arrange(tbl_precursor_quant(vault), quant_id))
     expect_equal(precursor_rows$quantity, c(10, 20, 100, 1))
     expect_equal(precursor_rows$rt_seconds, c(120, 180, 120, 180))

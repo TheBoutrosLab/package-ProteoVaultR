@@ -115,6 +115,56 @@ plot_precursor_quantity_distribution <- function(
     )
 }
 
+#' Plot peptide quantity distributions by sample
+#'
+#' Uses native DDA ProteinQuantifier peptide quantities. Each recorded peptide
+#' feature contributes one quantity per sample; charge states, modifications,
+#' and fractions are not collapsed. Nonpositive and missing quantities are
+#' excluded before taking log2.
+#'
+#' @param vault An open ProteoVault connection returned by [open_vault()].
+#' @param plot_type `"boxplot"` or `"violin"`.
+#' @param source_id Optional peptide quantification source identifier.
+#' @param samples Optional sample names to select and order. Attached
+#'   `sample_id` metadata changes x axis labels, while selection continues
+#'   to use the original sample names.
+#' @param method Exact peptide quantification method. Defaults to the recorded
+#'   method when there is only one, such as `"ProteinQuantifier"`.
+#' @param transform `"log2"` (default) or `"none"` to plot original quantities.
+#' @return A ggplot object. Quantities use the selected transformation.
+#' @export
+plot_peptide_quantity_distribution <- function(
+    vault,
+    plot_type = c("boxplot", "violin"),
+    source_id = NULL,
+    samples = NULL,
+    method = NULL,
+    transform = c("log2", "none")
+) {
+    plot_type <- match.arg(plot_type)
+    transform <- match.arg(transform)
+    method <- resolve_quant_method(vault, "peptide", method)
+    quantities <- tbl_peptide_quant(
+        vault = vault,
+        source_id = source_id,
+        method = method
+    ) %>%
+        dplyr::select(dplyr::all_of(c(
+            "sample_name", "feature_id", "quantity"
+        ))) %>%
+        dplyr::collect() %>%
+        dplyr::mutate(quantity_type = .env$method)
+    plot_quantity_distribution(
+        quantities = quantities,
+        samples = samples,
+        plot_type = plot_type,
+        quantity_types = method,
+        label = "peptide",
+        sample_labels = vault_sample_labels(vault),
+        transform = transform
+    )
+}
+
 #' Plot protein-group quantity distributions by sample
 #'
 #' Uses the DIA-NN matrix or DDA ProteinQuantifier method by default. Select
@@ -356,6 +406,12 @@ filter_qc_rows <- function(
 #' @param source_process Optional process name, such as `MSBooster`.
 #' @param search_engine Optional search-engine name.
 #' @param fraction_id Optional fraction ID; pass it as a string.
+#' @details For TMT channel metrics, `group` identifies a channel by its sample
+#'   name or channel description. A blank group identifies an undescribed
+#'   channel within its plex. Each channel is plotted as its own bar, using the
+#'   group label when unique. Unnamed or repeated labels use the reporter label
+#'   for one plex, or the channel sample name across multiple plexes. Bars follow
+#'   plex and reporter-channel order, regardless of their displayed labels.
 #' @param style Plotting style: `BPG` or `ggplot2`.
 #' @return A BPG trellis plot or a ggplot object, according to `style`.
 #' @export
@@ -389,9 +445,63 @@ plot_qc_metric <- function(
         metric$dataset_id,
         metric$sample_name
     )
-    if (anyNA(metric$sample) || any(!nzchar(metric$sample)) ||
-        anyNA(metric$group) || any(!nzchar(metric$group))) {
-        stop("QC rows need a dataset or sample name and a group", call. = FALSE)
+    if (anyNA(metric$sample) || any(!nzchar(metric$sample))) {
+        stop("QC rows need a dataset or sample name", call. = FALSE)
+    }
+    metric$group[is.na(metric$group)] <- ""
+
+    tmt_sample_order <- NULL
+    channels <- DBI::dbGetQuery(vault_connection(vault), paste(
+        "SELECT p.plex_name, s.sample_name, c.reporter_label, c.channel_description",
+        "FROM tmt_channels c JOIN tmt_plexes p USING (plex_id)",
+        "JOIN quant_channels q USING (channel_id)",
+        "JOIN samples s USING (sample_id)"
+    ))
+    if (nrow(channels)) {
+        qc_key <- paste(metric$sample_name, metric$group, sep = "\r")
+        sample_key <- paste(channels$plex_name, channels$sample_name, sep = "\r")
+        descriptions <- channels$channel_description
+        descriptions[is.na(descriptions)] <- ""
+        description_key <- paste(channels$plex_name, descriptions, sep = "\r")
+        direct <- match(qc_key, sample_key)
+        described <- match(qc_key, description_key)
+        selected <- direct
+        selected[is.na(selected)] <- described[is.na(selected)]
+        if (length(selected) && all(!is.na(selected))) {
+            by_description <- is.na(direct)
+            ambiguous <- duplicated(description_key) |
+                duplicated(description_key, fromLast = TRUE)
+            if (any(ambiguous[selected[by_description]])) {
+                stop("TMT QC channel descriptions are ambiguous within a plex",
+                    call. = FALSE)
+            }
+            one_plex <- length(unique(channels$plex_name[selected])) == 1L
+            fallback <- if (one_plex) {
+                channels$reporter_label[selected]
+            } else {
+                channels$sample_name[selected]
+            }
+            labels <- metric$group
+            labels[!nzchar(labels)] <- fallback[!nzchar(labels)]
+            metric$sample <- if (anyDuplicated(labels)) fallback else labels
+            reporters <- channels$reporter_label[selected]
+            channel_order <- order(
+                channels$plex_name[selected],
+                as.integer(sub("[^0-9].*$", "", reporters)),
+                match(sub("^[0-9]+", "", reporters), c("", "N", "C")),
+                reporters
+            )
+            tmt_sample_order <- unique(metric$sample[channel_order])
+            metric$group <- "all"
+        }
+    }
+    if (any(!nzchar(metric$group))) {
+        if (all(!nzchar(metric$group))) {
+            metric$group <- "all"
+        } else {
+            stop("QC rows with blank groups cannot be matched to TMT channels",
+                call. = FALSE)
+        }
     }
     if (anyDuplicated(metric[c("sample", "group")])) {
         stop(
@@ -407,14 +517,15 @@ plot_qc_metric <- function(
     }
 
     groups <- unique(metric$group)
-    if (length(groups) > 1L && !"all" %in% groups) {
-        stop("Grouped QC metrics must contain an 'all' group", call. = FALSE)
-    }
     group_order <- c(
         intersect(c("all", "target", "decoy", "unknown"), groups),
         sort(setdiff(groups, c("all", "target", "decoy", "unknown")))
     )
-    sample_order <- sort(unique(metric$sample))
+    sample_order <- if (is.null(tmt_sample_order)) {
+        sort(unique(metric$sample))
+    } else {
+        tmt_sample_order
+    }
     metric$sample <- factor(metric$sample, levels = rev(sample_order))
     metric$group <- factor(metric$group, levels = group_order)
 

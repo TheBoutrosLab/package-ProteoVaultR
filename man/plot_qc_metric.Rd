@@ -39,3 +39,11 @@ A BPG trellis plot or a ggplot object, according to \code{style}.
 \description{
 Plot a cohort QC metric across samples.
 }
+\details{
+For TMT channel metrics, \code{group} identifies a channel by its sample
+name or channel description. A blank group identifies an undescribed
+channel within its plex. Each channel is plotted as its own bar, using the
+group label when unique. Unnamed or repeated labels use the reporter label
+for one plex, or the channel sample name across multiple plexes. Bars follow
+plex and reporter-channel order, regardless of their displayed labels.
+}

@@ -34,9 +34,9 @@ Suggests:
     knitr,
     rmarkdown,
     roxygen2
-VignetteBuilder: knitr
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
 URL: https://github.com/TheBoutrosLab/package-ProteoVaultR
 BugReports: https://github.com/TheBoutrosLab/package-ProteoVaultR/issues
 Config/roxygen2/version: 8.0.0
+Config/Needs/website: pkgdown

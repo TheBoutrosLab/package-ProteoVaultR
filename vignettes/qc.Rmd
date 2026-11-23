@@ -1,68 +1,350 @@
 ---
-title: "Quality control plots"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Quality control plots}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+title: "Quality control"
 ---
 
-ProteoVaultR plots precursor and protein-group quantity distributions from the core DIA-NN matrices. The plots exclude missing and nonpositive quantities and use a log2 scale.
+Before comparing conditions, check whether the samples behave as you expect.
+Start with the acquisition and identification metrics recorded by SpectroMesa,
+then check quantity distributions, coverage, and sample relationships.
 
-```{r}
+This guide uses the HepG2 DIA demo and the sample assignments from
+[Preparing data](preparing-data.html). The examples run on the actual database
+when this page is built.
+
+## 1. Start with the prepared data
+
+If you already have `vault`, `sample_info`, `source_id`, and `se` from the previous
+guide, reopen the vault if needed and reattach the sample metadata. To run this
+article independently, recreate those objects below.
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 library(ProteoVaultR)
-
-fixture <- file.path("..", "tests", "fixtures", "example-vault.duckdb")
-vault <- open_vault(path = fixture)
-
-precursor_plot <- plot_precursor_quantity_distribution(
-    vault = vault,
-    quantity_type = "normalized",
-    plot_type = "boxplot"
+library(dplyr)
+library(ggplot2)
+knitr::opts_chunk$set(
+    collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 4.5,
+    dev.args = list(bg = "white")
 )
-protein_plot <- plot_protein_quantity_distribution(
-    vault = vault,
-    plot_type = "violin"
-)
-
-precursor_plot
-protein_plot
 ```
 
-Raw precursor quantities and a `max_q_value` filter use the DIA-NN report imported during the core build. The cutoff only filters rows present in the report; it cannot restore rows DIA-NN omitted.
-
-```{r}
-raw_plot <- plot_precursor_quantity_distribution(
-    vault = vault,
-    quantity_type = "raw",
-    plot_type = "boxplot",
-    max_q_value = 0.05
+```{r prepare-qc}
+data_dir <- Sys.getenv("PROTEOVAULTR_DEMO_DIR", unset = "demo-data")
+vault <- open_vault(
+    path = file.path(data_dir, "hepg2_ifna-dia.proteovault.duckdb")
 )
-raw_plot
+
+sample_info <- tibble::tribble(
+    ~sample_name,   ~sample_id, ~condition,
+    "Control_R1",  "Ctrl1",    "Control",
+    "Control_R2",  "Ctrl2",    "Control",
+    "Control_R3",  "Ctrl3",    "Control",
+    "IFNa_12h_R1", "IFNa1",    "IFNa",
+    "IFNa_12h_R2", "IFNa2",    "IFNa",
+    "IFNa_12h_R3", "IFNa3",    "IFNa"
+) %>%
+    mutate(condition = factor(condition, levels = c("Control", "IFNa")))
+vault <- set_sample_metadata(vault, sample_info)
+method <- "matrix"
+source_id <- resolve_quant_source(vault, level = "protein_group", method = method)
+se <- as_summarized_experiment(
+    vault,
+    level = "protein_group",
+    source_id = source_id,
+    method = method,
+    samples = sample_info$sample_name
+)
+quantity <- SummarizedExperiment::assay(se, "quantity")
+se
+```
+
+Here, `matrix` contains the imported DIA-NN protein-group matrix values, which
+may already include upstream normalization. We use these same measurements for
+the protein-level distribution, coverage, and PCA checks below.
+
+## 2. Check acquisition quality
+
+Start with the QC metrics imported from the pipeline. The inventory shows which
+layers are present in this database:
+
+```{r qc-inventory}
+qc <- tbl_qc_metrics(vault)
+qc %>%
+    group_by(layer) %>%
+    summarise(metrics = n_distinct(metric_name), .groups = "drop") %>%
+    arrange(layer) %>%
+    collect() %>%
+    knitr::kable(col.names = c("QC layer", "Distinct metrics"))
+```
+
+### 2.1. Compare MS2 scan counts
+
+Compare the number of MS2 scans collected in each run:
+
+```{r ms2-scans, fig.alt="Bar chart comparing MS2 scan counts across the six samples."}
+plot_qc_metric(vault, "ms2_scan_count")
+```
+
+A lower scan count can help explain a coverage difference. Check the run's
+`acquisition_duration` as well before concluding that acquisition was incomplete.
+
+### 2.2. Compare signal levels
+
+Total ion current is the sum of peak intensities within each spectrum.
+Compare its distribution across runs to look for shifts in signal:
+
+```{r total-ion-current, fig.alt="Percentile boxes comparing per-spectrum total ion current across the six samples."}
+plot_qc_boxplot(vault, "total_ion_current")
+```
+
+A shift may reflect sample loading, instrument response, or sample composition.
+Read it alongside the scan counts and quantity distributions.
+
+::: {.alert .alert-info role="note"}
+**Reading QC boxes:** `plot_qc_boxplot()` uses the stored percentiles. The line
+marks the median, the box spans the 25th to 75th percentiles, and the whiskers
+span the 5th to 95th percentiles. Individual observations and outliers are not shown.
+:::
+
+## 3. Check identification quality
+
+The `psm_features` layer contains summaries of the MSFragger search candidates
+processed by MSBooster.
+
+::: {.alert .alert-info role="note"}
+**Search candidates:** These PSM counts and feature distributions describe the
+candidates supplied for rescoring, before final FDR filtering. A target label does
+not by itself mean that a PSM is a confident identification.
+:::
+
+### 3.1. Compare PSM counts
+
+Start with the number of peptide-spectrum matches (PSMs) in each sample:
+
+```{r psm-counts, fig.height=5.5, fig.alt="Grouped bar chart comparing search-candidate PSM counts across samples by target and decoy label."}
+plot_qc_metric(vault, "feature_psm_count")
+```
+
+`all` is the combined count; `target`, `decoy`, and `unknown` divide candidates by
+their recorded labels. Compare counts across replicates, and investigate a sample
+with fewer candidates alongside its acquisition and signal checks.
+
+### 3.2. Inspect mass accuracy
+
+Signed precursor mass error is reported in parts per million (ppm):
+
+```{r mass-error, fig.alt="Percentile boxes comparing signed precursor mass error for target and decoy search candidates across samples."}
+plot_qc_boxplot(vault, "feature_mass_error_ppm_signed")
+```
+
+Check whether the distributions are centered near zero. A shift above or below
+zero can reveal a systematic mass offset; a wider distribution shows more variable
+errors. Compare these patterns across replicates.
+
+### 3.3. Inspect spectral agreement
+
+MSBooster's weighted spectral entropy measures agreement between observed and
+predicted fragment intensities. Higher scores indicate closer agreement; the
+weighting means the score is not restricted to a 0–1 scale. See the
+[MSBooster feature definitions](https://github.com/Nesvilab/MSBooster#calculated-features).
+
+```{r spectral-agreement, fig.alt="Percentile boxes comparing weighted spectral entropy for target and decoy search candidates across samples."}
+plot_qc_boxplot(vault, "feature_weighted_spectral_entropy")
+```
+
+In this demo, targets have higher scores than decoys. Check that this pattern is
+consistent across replicates, and investigate a sample whose target distribution
+shifts toward the decoy distribution.
+
+### 3.4. Inspect retention-time agreement
+
+`feature_delta_rt_loess` summarizes the deviation between observed and predicted
+retention times after LOESS calibration. Smaller deviations indicate closer
+agreement. MSBooster reports this feature in predicted RT units, rather than
+minutes; see its [feature definitions](https://github.com/Nesvilab/MSBooster#calculated-features).
+
+```{r retention-time-agreement, fig.alt="Percentile boxes comparing calibrated retention-time deviations for target and decoy search candidates across samples."}
+plot_qc_boxplot(vault, "feature_delta_rt_loess")
+```
+
+Targets show smaller deviations than decoys in this demo. Look for unusually
+large or variable target deviations, and review them together with spectral
+agreement rather than treating either feature as a standalone quality cutoff.
+
+## 4. Compare quantity distributions
+
+Next, inspect the quantities that will be used for analysis. Start at the
+precursor level, then look at the protein groups summarized from those signals.
+
+### 4.1. Precursor quantities
+
+By default, this plots the imported DIA-NN precursor matrix:
+
+```{r precursor-quantity-distributions, fig.alt="Boxplots of positive log2 precursor quantities for the six HepG2 samples."}
+plot_precursor_quantity_distribution(vault)
+```
+
+### 4.2. Protein-group quantities
+
+Compare the same samples at the protein-group level:
+
+```{r quantity-distributions, fig.alt="Boxplots of positive log2 protein-group quantities for the six HepG2 samples."}
+plot_protein_quantity_distribution(vault)
+```
+
+Compare the middle of each distribution and its spread. A sample with a different
+signal level or a much wider distribution deserves a closer look, especially if
+its other QC measures also differ. Checking both levels can help you see whether
+a change is already present in the precursor signals or is more apparent after
+protein-group summarization.
+
+::: {.alert .alert-info role="note"}
+**A plotting scale:** These plots take log2 of positive quantities for display and
+omit missing and nonpositive values. They do not change the assay stored in `se`
+or the database. Similar-looking distributions alone do not establish good quality.
+:::
+
+## 5. Check coverage and missing values
+
+### 5.1. Count quantified protein groups
+
+Count the groups with a positive quantity in each sample:
+
+```{r quantified-counts}
+counts <- summarize_quantified_counts(
+    vault,
+    level = "protein_group",
+    source_id = source_id,
+    method = method
+)
+counts %>%
+    select(sample_name, quantified_count) %>%
+    knitr::kable(col.names = c("Sample", "Quantified protein groups"))
+```
+
+A lower count can reflect less signal, incomplete acquisition, or a difference
+in the sample itself. Interpret the counts alongside the distributions and
+acquisition metrics rather than using one count as an exclusion rule.
+
+### 5.2. Inspect missing and zero quantities
+
+Missing measurements and recorded zeros are different. Keep them separate in
+this summary; percentages use all protein groups in the selected matrix.
+
+```{r missingness-summary}
+tibble::tibble(
+    sample = sample_info$sample_id,
+    missing = colSums(is.na(quantity)),
+    missing_percent = 100 * colMeans(is.na(quantity)),
+    zero = colSums(quantity == 0, na.rm = TRUE)
+) %>%
+    knitr::kable(
+        col.names = c("Sample", "Missing", "Missing (%)", "Zeros"),
+        digits = 2
+    )
+```
+
+### 5.3. Check consistency across samples
+
+How many groups are quantified in all six samples, and how many appear in only
+some? Summarize the number of samples with a positive quantity for each group:
+
+```{r coverage-plot, fig.alt="Bar chart showing how many protein groups have positive quantities in each number of samples."}
+coverage <- summarize_quantification_coverage(
+    vault,
+    level = "protein_group",
+    source_id = source_id,
+    method = method
+)
+coverage %>%
+    count(n_samples, name = "protein_groups") %>%
+    ggplot(aes(x = n_samples, y = protein_groups)) +
+    geom_col(fill = "#4E9DA6", colour = "black") +
+    scale_x_continuous(breaks = 0:ncol(quantity)) +
+    labs(x = "Samples with a positive quantity", y = "Protein groups") +
+    theme_boutroslab()
+```
+
+Groups measured consistently are convenient for comparing samples. Groups seen
+in only part of the cohort can still be biologically useful; their missingness
+needs consideration in the later analysis.
+
+## 6. Compare samples with PCA
+
+Finally, inspect overall sample relationships. Use protein groups with positive,
+finite quantities in every sample, and remove constant rows. This gives PCA a
+shared set of features without filling missing values.
+
+```{r prepare-sample-comparison}
+log_quantity <- quantity
+log_quantity[!is.finite(log_quantity) | log_quantity <= 0] <- NA_real_
+log_quantity <- log2(log_quantity)
+complete <- rowSums(is.finite(log_quantity)) == ncol(log_quantity)
+comparison <- log_quantity[complete, , drop = FALSE]
+comparison <- comparison[apply(comparison, 1, stats::var) > 0, , drop = FALSE]
+nrow(comparison)
+```
+
+The result is the number of protein groups retained for PCA. `quantity` and the
+`quantity` assay in `se` remain unchanged.
+
+::: {.alert .alert-warning role="note"}
+**A selected view of the data:** Complete-case plots leave out groups with missing
+or nonpositive values. They can therefore miss problems that are visible in the
+coverage checks. This selection is for these diagnostic plots, not a decision to
+drop those groups from every later analysis.
+:::
+
+Transpose the matrix so samples are observations, then center each protein
+group's log2 quantities. Here we keep their existing relative variances rather
+than scaling every group
+to unit variance. See [the R PCA documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/prcomp.html)
+for these options.
+
+```{r sample-pca, fig.alt="PCA scores for the six HepG2 samples, colored by control or IFNa condition and labeled by sample."}
+pca <- stats::prcomp(t(comparison), center = TRUE, scale. = FALSE)
+variance_percent <- 100 * pca$sdev^2 / sum(pca$sdev^2)
+pca_samples <- as.data.frame(pca$x[, 1:2, drop = FALSE]) %>%
+    mutate(
+        sample_id = sample_info$sample_id,
+        condition = sample_info$condition
+    )
+ggplot(pca_samples, aes(x = PC1, y = PC2, colour = condition)) +
+    geom_point(size = 3) +
+    geom_text(
+        aes(label = sample_id), vjust = -0.8,
+        size = 11 / (72.27 / 25.4), fontface = "bold", show.legend = FALSE
+    ) +
+    scale_colour_manual(values = c(Control = "#4E9DA6", IFNa = "#D98C70")) +
+    scale_x_continuous(expand = expansion(mult = 0.15)) +
+    scale_y_continuous(expand = expansion(mult = 0.15)) +
+    labs(
+        x = sprintf("PC1 (%.1f%%)", variance_percent[1]),
+        y = sprintf("PC2 (%.1f%%)", variance_percent[2]),
+        colour = "Condition"
+    ) +
+    theme_boutroslab()
+```
+
+In this demo, the conditions separate along PC1, while variation among replicates
+is visible along PC2. Check whether replicates cluster together and whether a
+sample lies apart from the others. Separation between control and IFNα samples
+may reflect the treatment response. It is not, by itself, a reason to exclude samples.
+
+## 7. Decide what to do next
+
+Consider these checks together. A sample with lower coverage, a shifted quantity
+distribution, and unusual acquisition or identification metrics warrants more
+investigation than one that differs in a single plot. Use preparation notes and acquisition records
+to help distinguish technical problems from biological variation.
+
+Record any sample exclusions and the evidence supporting them. The code in this
+guide does not exclude samples, normalize the assay, or impute missing values.
+Those choices come after reviewing the QC results.
+
+```{r close-vault}
 close_vault(vault)
+vault
 ```
 
-The fixture includes a small DIA-NN report source. A production vault needs that report for raw quantities or a `max_q_value` filter. The optional `qc` layer contains published cohort QC metrics. Inspect available metric names before plotting; they depend on the QC pipeline output.
-
-```{r, eval=FALSE}
-metrics <- tbl_qc_metrics(vault = vault)
-available_metrics <- dplyr::collect(
-    dplyr::distinct(metrics, metric_name)
-)
-
-metric_plot <- plot_qc_metric(
-    vault = vault,
-    metric_name = available_metrics$metric_name[[1L]],
-    style = "ggplot2"
-)
-
-charge_plot <- plot_qc_charge_psm_counts(
-    vault = vault,
-    charges = 1:4,
-    style = "BPG"
-)
-
-close_vault(vault)
-```
-
-`plot_qc_boxplot()` displays percentile summaries where the QC output supplies p05, p25, p50, p75, and p95 metrics. The `plot_qc_metric()`, `plot_qc_boxplot()`, and `plot_qc_charge_psm_counts()` functions accept source and fraction filters; see their R help pages. BPG plots return lattice objects, while the distribution plots return ggplot objects.
+Keep the prepared `se` object. Next, see [Normalization](normalization.html)
+to decide whether an additional adjustment is useful before handling missing
+values and testing differences between conditions.
