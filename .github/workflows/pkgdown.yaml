@@ -31,7 +31,7 @@ jobs:
 
       - name: Restore DIA demo database
         id: demo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: vignettes/demo-data/hepg2_ifna-dia.proteovault.duckdb
           key: proteovaultr-demo-v2-${{ hashFiles('.github/demo-data.json') }}
@@ -43,7 +43,7 @@ jobs:
       # does not force another S3 download. PRs restore but do not save caches.
       - name: Cache verified DIA demo database
         if: github.event_name != 'pull_request' && steps.demo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: vignettes/demo-data/hepg2_ifna-dia.proteovault.duckdb
           key: ${{ steps.demo-cache.outputs.cache-primary-key }}
@@ -65,7 +65,7 @@ jobs:
               sep = "", file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
 
       - name: Cache R packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ env.R_LIBS_USER }}
           key: pkgdown-r-${{ runner.os }}-${{ runner.arch }}-${{ steps.r-version.outputs.version }}-${{ hashFiles('DESCRIPTION', '.github/workflows/pkgdown.yaml') }}
